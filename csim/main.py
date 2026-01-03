@@ -1,126 +1,66 @@
-from PythonParserVisitor import PythonParserVisitor
-from zss import Node
-from antlr4 import TerminalNode
-
-EXCLUDED_RULES = {
-    # wrappers
-    "Statement",
-    "Statements",
-    "Simple_stmts",
-    "Simple_stmt",
-    "Star_expression",
-    "Star_expressions",
-    "Function_def_raw",
-    # precedence / expressions
-    "Disjunction",
-    "Conjunction",
-    "Inversion",
-    "Comparison",
-    "Bitwise_or",
-    "Bitwise_xor",
-    "Bitwise_and",
-    "Shift_expr",
-    "Sum",
-    "Term",
-    "Factor",
-    "Power",
-    "Await_primary",
-    "Primary",
-    "Atom",
-    # names
-    "Name",
-    "Name_except_underscore",
-    # other technicals
-    "Target_with_star_atom",
-    "Star_atom",
-    # collapse rules
-    "Import_name",
-    "Dotted_as_names",
-    "Dotted_as_name",
-    "Dotted_name",
-}
-
-EXCLUDED_TOKENS = {"(", ")", ":", ",", "<INDENT>", "<DEDENT>", "<EOF>"}
-
-
-class ZssBuilderVisitor(PythonParserVisitor):
-
-    def visitChildren(self, node):
-        rule_name = type(node).__name__.replace("Context", "")
-        children_nodes = []
-
-        for child in node.getChildren():
-            if isinstance(child, TerminalNode):
-                text = child.getText()
-                if text not in EXCLUDED_TOKENS and text.strip():
-                    children_nodes.append(Node(f"TOKEN:{text}"))
-            else:
-                result = self.visit(child)
-                if result is not None:
-                    children_nodes.append(result)
-
-        # 1. Rules to collapse completely
-        if rule_name in EXCLUDED_RULES:
-            if len(children_nodes) == 1:
-                return children_nodes[0]
-            elif len(children_nodes) > 1:
-                group = Node("GROUP")
-                for c in children_nodes:
-                    group.addkid(c)
-                return group
-            else:
-                return None
-
-        # 2. Valid rule, create node
-        zss_node = Node(rule_name)
-        for c in children_nodes:
-            zss_node.addkid(c)
-
-        return zss_node
-
-
-from antlr4 import *
-from PythonParser import PythonParser
-from PythonLexer import PythonLexer
-
-
-def main():
-    code_example = """
-import os
+import argparse
 import sys
+import time
+import threading
+from .utils import process_files, get_file
+from .CodeSimilarity import Compare
+
+
+# Spinner function
+def spinner(message):
+    stop_spinner = threading.Event()
+
+    def spinning():
+        while not stop_spinner.is_set():
+            for char in "|/-\\":
+                if stop_spinner.is_set():
+                    break
+                sys.stdout.write(f"\r{message} {char}")
+                sys.stdout.flush()
+                time.sleep(0.1)
+
+    spinner_thread = threading.Thread(target=spinning, daemon=True)
+    spinner_thread.start()
+    return stop_spinner.set
+
 
 def main():
-    x = 5
-    y = 10
-    result = x + y
-    print("The result is:", result)
+    """
+    Main function to parse command-line arguments and execute the similarity checker.
+    Arguments:
+        --files, -f (str, nargs=2): The input two files to compare.
+    Returns:
+        None
+    """
+    # Create the argument parser
+    parser = argparse.ArgumentParser(
+        description="Code Similarity Checker"
+    )
 
-if __name__ == "__main__":
-    main()
-"""
+    # Create a mutually exclusive group
+    group = parser.add_mutually_exclusive_group(required=True)
 
-    input_stream = InputStream(code_example)
-    lexer = PythonLexer(input_stream)
-    token_stream = CommonTokenStream(lexer)
-    parser = PythonParser(token_stream)
+    # Add the 'files' argument to the group
+    group.add_argument(
+        "--files", "-f", type=get_file, nargs=2, help="The input two files to compare"
+    )
 
-    # ANTLR tree
-    tree = parser.file_input()
+    # Parse the arguments
+    args = parser.parse_args()
 
-    # Visitor
-    visitor = ZssBuilderVisitor()
+    # Process the files
+    file_names, file_contents = process_files(args)
 
-    # ZSS tree
-    zss_tree = visitor.visit(tree)
-
-    def print_tree(node, indent=0):
-        if node is None:
-            return
-        print("  " * indent + node.label)
-        for child in node.children:
-            print_tree(child, indent + 1)
-
-    print_tree(zss_tree)
+    if len(file_names) == 2:
+        stop_spinner = spinner("Calculating similarity...")
+        try:
+            results = Compare(file_contents[0], file_contents[1])
+        finally:
+            stop_spinner()
+            print()
+        print(results)
+    else:
+        print("Error: Please provide exactly two files for comparison.")
 
 
 if __name__ == "__main__":

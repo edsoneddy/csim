@@ -1,7 +1,3 @@
-from PythonParserVisitor import PythonParserVisitor
-from antlr4 import TerminalNode
-from zss import Node
-
 EXCLUDED_RULES = {
     # wrappers
     "Statement",
@@ -42,53 +38,39 @@ EXCLUDED_RULES = {
 
 EXCLUDED_TOKENS = {"(", ")", ":", ",", "<INDENT>", "<DEDENT>", "<EOF>"}
 
+import argparse
+from pathlib import Path
 
-class Visitor(PythonParserVisitor):
-
-    def __init__(self):
-        super().__init__()
-        self.node_count = 0
-
-    def visitChildren(self, node):
-        rule_name = type(node).__name__.replace("Context", "")
-        children_nodes = []
-
-        for child in node.getChildren():
-            if isinstance(child, TerminalNode):
-                text = child.getText()
-                if text not in EXCLUDED_TOKENS and text.strip():
-                    self.node_count += 1
-                    children_nodes.append(Node(f"TOKEN:{text}"))
-            else:
-                result = self.visit(child)
-                if result is not None:
-                    children_nodes.append(result)
-
-        # 1. Rules to collapse completely
-        if rule_name in EXCLUDED_RULES:
-            if len(children_nodes) == 1:
-                return children_nodes[0]
-            elif len(children_nodes) > 1:
-                self.node_count += 1
-                group = Node("GROUP")
-                for c in children_nodes:
-                    group.addkid(c)
-                return group
-            else:
-                return None
-
-        # 2. Valid rule, create node
-        self.node_count += 1
-        zss_node = Node(rule_name)
-        for c in children_nodes:
-            zss_node.addkid(c)
-
-        return zss_node
+# Utility functions for argument parsing
 
 
-def Normalize(tree):
+def get_file(file_path):
+    if not Path(file_path).is_file():
+        raise argparse.ArgumentTypeError(f"File '{file_path}' does not exist.")
+    return file_path
 
-    visitor = Visitor()
-    normalized_tree = visitor.visit(tree)
 
-    return normalized_tree, visitor.node_count
+def read_file(file_path):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            content = file.read()
+        return file_path, content
+    except Exception as e:
+        print(f"Error reading file {file_path}: {e}")
+        return file_path, None
+
+
+def process_files(args):
+    # Storage for file names and contents
+    file_names = []
+    file_contents = []
+    # Process the files based on the provided arguments
+    if args.files is not None:
+        file1, file2 = args.files
+        file_name1, content1 = read_file(file1)
+        file_name2, content2 = read_file(file2)
+        # Store the file name and content
+        file_names.extend([file_name1, file_name2])
+        file_contents.extend([content1, content2])
+
+    return file_names, file_contents

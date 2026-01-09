@@ -24,6 +24,12 @@ class Visitor(PythonParserVisitor):
                     self.node_count += 1
                     children_nodes.append(Node(token.type))
             else:
+                # Special case: list nodes are collapsed into a single node
+                if child.getRuleIndex() == PythonParser.RULE_list:
+                    self.node_count += 1
+                    children_nodes.append(Node(PythonParser.RULE_list))
+                    continue
+
                 result = self.visit(child)
                 if result is not None:
                     children_nodes.append(result)

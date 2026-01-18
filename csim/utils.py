@@ -32,3 +32,21 @@ def process_files(args):
         file_contents.extend([content1, content2])
 
     return file_names, file_contents
+
+# offset to avoid collision between token types and rule indices
+TOKEN_TYPE_OFFSET = 1000
+
+def get_excluded_token_types(lang):
+    """Retrieve excluded token types based on the programming language.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        set: Set of excluded token types.
+    """
+    if lang == "python":
+        from .python.py_utils import EXCLUDED_TOKEN_TYPES
+        return EXCLUDED_TOKEN_TYPES
+    else:
+        return set()  # Default to empty set for unsupported languages

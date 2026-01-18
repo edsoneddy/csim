@@ -1,8 +1,5 @@
 from .PythonParser import PythonParser
 
-GROUP_INDEX = -1000
-TOKEN_TYPE_OFFSET = 1000
-
 EXCLUDED_RULE_INDICES = {
     # wrappers
     PythonParser.RULE_statement,

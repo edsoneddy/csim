@@ -22,6 +22,11 @@ def main():
         "--files", "-f", type=get_file, nargs=2, help="The input two files to compare"
     )
 
+    # Add the 'lang' argument to the group
+    group.add_argument(
+        "--lang", "-l", type=str, help="The programming language to use for comparison (e.g., python, java)", default="python"
+    )
+
     # Parse the arguments
     args = parser.parse_args()
 
@@ -30,7 +35,7 @@ def main():
 
     if len(file_names) == 2:
         try:
-            results = Compare(file_contents[0], file_contents[1])
+            results = Compare(file_contents[0], file_contents[1], args.lang)
             print(results)
         except Exception as e:
             print(f"An error occurred during comparison: {e}")

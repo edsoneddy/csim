@@ -1,7 +1,7 @@
 from .python.PythonParser import PythonParser
 from .python.PythonLexer import PythonLexer
 from .python.PythonParserVisitor import PythonParserVisitor
-from .python.py_utils import EXCLUDED_TOKEN_TYPES, TOKEN_TYPE_OFFSET
+from .utils import TOKEN_TYPE_OFFSET, get_excluded_token_types
 from antlr4 import InputStream, CommonTokenStream, TerminalNode
 from antlr4 import CommonTokenStream
 from zss import simple_distance, Node
@@ -14,9 +14,10 @@ class Visitor(PythonParserVisitor):
     compressing redundant nodes and counting total nodes for similarity metrics.
     """
 
-    def __init__(self):
+    def __init__(self, excluded_token_types):
         super().__init__()
         self.node_count = 0
+        self.excluded_token_types = excluded_token_types
 
     def visitChildren(self, node):
         """Visit and process all children of a parse tree node.
@@ -33,7 +34,7 @@ class Visitor(PythonParserVisitor):
         for child in node.getChildren():
             if isinstance(child, TerminalNode):
                 token = child.symbol
-                if token.type not in EXCLUDED_TOKEN_TYPES:
+                if token.type not in self.excluded_token_types:
                     self.node_count += 1
                     children_nodes.append(Node(token.type + TOKEN_TYPE_OFFSET))
             else:
@@ -72,7 +73,7 @@ class Visitor(PythonParserVisitor):
         return Node(list_idx)
 
 
-def Normalize(tree):
+def Normalize(tree, lang):
     """Normalize an ANTLR parse tree into a ZSS tree structure.
 
     Args:
@@ -82,26 +83,30 @@ def Normalize(tree):
         tuple: (normalized_tree, node_count) where normalized_tree is a ZSS Node
                and node_count is the total number of nodes in the tree.
     """
-    visitor = Visitor()
+    excluded_token_types = get_excluded_token_types(lang)
+    visitor = Visitor(excluded_token_types)
     normalized_tree = visitor.visit(tree)
 
     return normalized_tree, visitor.node_count
 
 
-def ANTLR_parse(code):
-    """Parse Python source code into an ANTLR parse tree.
+def ANTLR_parse(code, lang):
+    """Parse source code into an ANTLR parse tree.
 
     Args:
-        code: Python source code as a string.
+        code: source code as a string.
+        lang: programming language of the source code (currently only 'python' supported).
 
     Returns:
         ANTLR parse tree representing the code's syntactic structure.
     """
-    input_stream = InputStream(code)
-    lexer = PythonLexer(input_stream)
-    token_stream = CommonTokenStream(lexer)
-    parser = PythonParser(token_stream)
-    tree = parser.file_input()
+    tree = None
+    if lang == "python":
+        input_stream = InputStream(code)
+        lexer = PythonLexer(input_stream)
+        token_stream = CommonTokenStream(lexer)
+        parser = PythonParser(token_stream)
+        tree = parser.file_input()
     return tree
 
 
@@ -140,7 +145,7 @@ def label_dist(a, b):
     return 0 if a == b else 1
 
 
-def Compare(code_a, code_b):
+def Compare(code_a, code_b, lang="python"):
     """Compare two Python code snippets and compute their similarity.
 
     The comparison process:
@@ -157,17 +162,23 @@ def Compare(code_a, code_b):
         float: Similarity score in the range [0, 1], where 1 indicates
                identical code structure and 0 indicates maximum difference.
     """
-    # Parse both code snippets into ANTLR parse trees
-    T1 = ANTLR_parse(code_a)
-    T2 = ANTLR_parse(code_b)
 
-    # Normalize parse trees and get node counts
-    N1, len_N1 = Normalize(T1)
-    N2, len_N2 = Normalize(T2)
+    try:
+        # Parse both code snippets into ANTLR parse trees
+        T1 = ANTLR_parse(code_a, lang)
+        T2 = ANTLR_parse(code_b, lang)
 
-    # Compute tree edit distance using Zhang-Shasha algorithm
-    d = simple_distance(N1, N2, label_dist=label_dist)
+        # Normalize parse trees and get node counts
+        N1, len_N1 = Normalize(T1, lang)
+        N2, len_N2 = Normalize(T2, lang)
 
-    # Calculate and return normalized similarity index
-    s = SimilarityIndex(d, len_N1, len_N2)
+        # Compute tree edit distance using Zhang-Shasha algorithm
+        d = simple_distance(N1, N2, label_dist=label_dist)
+
+        # Calculate and return normalized similarity index
+        s = SimilarityIndex(d, len_N1, len_N2)
+    except Exception as e:
+        print(f"Error during comparison: {e}")
+        s = None
+
     return s

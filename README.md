@@ -46,24 +46,8 @@ similarity = Compare(code_a, code_b)
 print(f"Similarity: {similarity}")
 ```
 
-## Parser Generation
-
-This section describes how to regenerate the parser files using ANTLR 4. You do not need to follow these steps unless you intend to modify the grammar.
-
-The Python parser files (e.g., `PythonLexer.py`, `PythonParser.py`, `PythonParserVisitor.py`) located in the `csim/` directory were generated using the ANTLR 4 tool. The grammar files (`PythonLexer.g4` and `PythonParser.g4`) were sourced from the [antlr/grammars-v4/python3_13](https://github.com/antlr/grammars-v4/tree/master/python/python3_13) repository.
-
-To regenerate the files, run the following command from the `grammars/` directory:
-
-```sh
-antlr4 -Dlanguage=Python3 -visitor -o ../csim/ PythonLexer.g4 PythonParser.g4
-```
-
-This command instructs ANTLR to generate Python 3 code (`-Dlanguage=Python3`), create a visitor class (`-visitor`), and output the resulting files into the `../csim/` directory.
-
-Additionally, we need download `PythonLexerBase.py` file from the ANTLR4 grammars GitHub repository and move them to the csim directory:
-```sh
-curl -O https://raw.githubusercontent.com/antlr/grammars-v4/master/python/python3_13/Python3/PythonLexerBase.py 
-```
+## ANTLR4 Instalation and Parser/Lexer Generation
+This instalation is not required the files are already included in the project. But if you can review the steps to generate them yourself in the [grammars/README.md](grammars/parser_gen_guide.md) file.
 
 ## Contributing
 

@@ -1,7 +1,7 @@
-from .PythonParser import PythonParser
-from .PythonLexer import PythonLexer
-from .PythonParserVisitor import PythonParserVisitor
-from .utils import EXCLUDED_TOKEN_TYPES, GROUP_INDEX, TOKEN_TYPE_OFFSET
+from .python.PythonParser import PythonParser
+from .python.PythonLexer import PythonLexer
+from .python.PythonParserVisitor import PythonParserVisitor
+from .python.py_utils import EXCLUDED_TOKEN_TYPES, TOKEN_TYPE_OFFSET
 from antlr4 import InputStream, CommonTokenStream, TerminalNode
 from antlr4 import CommonTokenStream
 from zss import simple_distance, Node

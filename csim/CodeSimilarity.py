@@ -1,76 +1,94 @@
 from .python.PythonParser import PythonParser
 from .python.PythonLexer import PythonLexer
 from .python.PythonParserVisitor import PythonParserVisitor
+from .java.Java20Parser import Java20Parser
+from .java.Java20Lexer import Java20Lexer
+from .java.Java20ParserVisitor import Java20ParserVisitor
 from .utils import TOKEN_TYPE_OFFSET, get_excluded_token_types
 from antlr4 import InputStream, CommonTokenStream, TerminalNode
 from antlr4 import CommonTokenStream
 from zss import simple_distance, Node
 
 
-class Visitor(PythonParserVisitor):
-    """Visitor pattern implementation for traversing and normalizing ANTLR parse trees.
-
-    Converts the ANTLR parse tree into a normalized ZSS tree structure while
-    compressing redundant nodes and counting total nodes for similarity metrics.
+def get_parser_visitor_class(lang):
     """
+    Factory function to create a ParserVisitor class with the correct base visitor.
+    """
+    base_visitor = None
+    if lang == "python":
+        base_visitor = PythonParserVisitor
+    elif lang == "java":
+        base_visitor = Java20ParserVisitor
 
-    def __init__(self, excluded_token_types):
-        super().__init__()
-        self.node_count = 0
-        self.excluded_token_types = excluded_token_types
+    if base_visitor is None:
+        raise ValueError(f"Unsupported language: {lang}")
 
-    def visitChildren(self, node):
-        """Visit and process all children of a parse tree node.
+    class ParserVisitor(base_visitor):
+        """ParserVisitor pattern implementation for traversing and normalizing ANTLR parse trees.
 
-        Args:
-            node: ANTLR parse tree node to process.
-
-        Returns:
-            A ZSS Node representing the normalized subtree.
+        Converts the ANTLR parse tree into a normalized ZSS tree structure while
+        compressing redundant nodes and counting total nodes for similarity metrics.
         """
-        rule_index = node.getRuleIndex()
-        children_nodes = []
 
-        for child in node.getChildren():
-            if isinstance(child, TerminalNode):
-                token = child.symbol
-                if token.type not in self.excluded_token_types:
-                    self.node_count += 1
-                    children_nodes.append(Node(token.type + TOKEN_TYPE_OFFSET))
-            else:
-                result = self.visit(child)
-                if result is not None:
-                    children_nodes.append(result)
+        def __init__(self, excluded_token_types):
+            super().__init__()
+            self.node_count = 0
+            self.excluded_token_types = excluded_token_types
 
-        # Node compression: simplify tree structure
-        if len(children_nodes) == 1:
-            # Single child: return it directly to avoid unnecessary nesting
-            return children_nodes[0]
+        def visitChildren(self, node):
+            """Visit and process all children of a parse tree node.
 
-        # Create parent node for multiple children
-        self.node_count += 1
-        parent_node = Node(rule_index)
-        for c in children_nodes:
-            parent_node.addkid(c)
-        return parent_node
+            Args:
+                node: ANTLR parse tree node to process.
 
-    def visitStar_named_expressions(self, node):
-        """Handle star_named_expressions to avoid creating excessive nodes.
+            Returns:
+                A ZSS Node representing the normalized subtree.
+            """
+            rule_index = node.getRuleIndex()
+            children_nodes = []
 
-        This special case prevents deeply nested structures in list/tuple literals,
-        replacing them with a single node.
+            for child in node.getChildren():
+                if isinstance(child, TerminalNode):
+                    token = child.symbol
+                    if token.type not in self.excluded_token_types:
+                        self.node_count += 1
+                        children_nodes.append(Node(token.type + TOKEN_TYPE_OFFSET))
+                else:
+                    result = self.visit(child)
+                    if result is not None:
+                        children_nodes.append(result)
 
-        Example: [1, 2, 3, ..., k] is collapsed into one node.
+            # Node compression: simplify tree structure
+            if len(children_nodes) == 1:
+                # Single child: return it directly to avoid unnecessary nesting
+                return children_nodes[0]
 
-        Args:
-            node: The star_named_expressions parse tree node.
+            # Create parent node for multiple children
+            self.node_count += 1
+            parent_node = Node(rule_index)
+            for c in children_nodes:
+                parent_node.addkid(c)
+            return parent_node
 
-        Returns:
-            A single ZSS Node representing the entire expression list.
-        """
-        list_idx = node.getRuleIndex()
-        self.node_count += 1
-        return Node(list_idx)
+        def visitStar_named_expressions(self, node):
+            """Handle star_named_expressions to avoid creating excessive nodes.
+
+            This special case prevents deeply nested structures in list/tuple literals,
+            replacing them with a single node.
+
+            Example: [1, 2, 3, ..., k] is collapsed into one node.
+
+            Args:
+                node: The star_named_expressions parse tree node.
+
+            Returns:
+                A single ZSS Node representing the entire expression list.
+            """
+            list_idx = node.getRuleIndex()
+            self.node_count += 1
+            return Node(list_idx)
+
+    return ParserVisitor
 
 
 def Normalize(tree, lang):
@@ -78,13 +96,18 @@ def Normalize(tree, lang):
 
     Args:
         tree: ANTLR parse tree to normalize.
+        lang: The programming language of the source code.
 
     Returns:
         tuple: (normalized_tree, node_count) where normalized_tree is a ZSS Node
                and node_count is the total number of nodes in the tree.
     """
     excluded_token_types = get_excluded_token_types(lang)
-    visitor = Visitor(excluded_token_types)
+
+    # Get the correct ParserVisitor class for the given language
+    ParserVisitorClass = get_parser_visitor_class(lang)
+    visitor = ParserVisitorClass(excluded_token_types)
+
     normalized_tree = visitor.visit(tree)
 
     return normalized_tree, visitor.node_count
@@ -95,18 +118,26 @@ def ANTLR_parse(code, lang):
 
     Args:
         code: source code as a string.
-        lang: programming language of the source code (currently only 'python' supported).
+        lang: programming language of the source code (e.g. python, java, etc.).
 
     Returns:
         ANTLR parse tree representing the code's syntactic structure.
     """
     tree = None
+    parser = None
+    input_stream = InputStream(code)
+
     if lang == "python":
-        input_stream = InputStream(code)
         lexer = PythonLexer(input_stream)
         token_stream = CommonTokenStream(lexer)
         parser = PythonParser(token_stream)
         tree = parser.file_input()
+    elif lang == "java":
+        lexer = Java20Lexer(input_stream)
+        token_stream = CommonTokenStream(lexer)
+        parser = Java20Parser(token_stream)
+        tree = parser.compilationUnit()
+
     return tree
 
 

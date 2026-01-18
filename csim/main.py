@@ -12,19 +12,27 @@ def main():
         None
     """
     # Create the argument parser
-    parser = argparse.ArgumentParser(description="Code Similarity Checker")
-
-    # Create a mutually exclusive group
-    group = parser.add_mutually_exclusive_group(required=True)
+    parser = argparse.ArgumentParser(
+        description="Compare two source code files for similarity."
+    )
 
     # Add the 'files' argument to the group
-    group.add_argument(
-        "--files", "-f", type=get_file, nargs=2, help="The input two files to compare"
+    parser.add_argument(
+        "--files",
+        "-f",
+        nargs=2,
+        metavar=("FILE1", "FILE2"),
+        help="The two source code files to compare.",
+        required=True,
     )
 
     # Add the 'lang' argument to the group
-    group.add_argument(
-        "--lang", "-l", type=str, help="The programming language to use for comparison (e.g., python, java)", default="python"
+    parser.add_argument(
+        "--lang",
+        "-l",
+        choices=["python", "java"],
+        default="python",
+        help="The programming language of the source files. Defaults to 'python'.",
     )
 
     # Parse the arguments

@@ -35,3 +35,8 @@ EXCLUDED_TOKEN_TYPES = {
     PythonLexer.EXCEPT,
     PythonLexer.FINALLY,
 }
+
+HASHED_RULE_INDICES = {
+    PythonParser.RULE_assignment,
+}
+

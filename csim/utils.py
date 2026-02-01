@@ -61,3 +61,17 @@ def get_excluded_token_types(lang):
         return python_excluded
     else:
         return set()  # Default to empty set for unsupported languages
+
+def get_hash_rule_indices(lang):
+    """Retrieve hashed rule indices based on the programming language.
+    Args:
+        lang (str): Programming language identifier.
+    Returns:
+        set: Set of hashed rule indices.
+    """
+    if lang == "python":
+        from .python.utils import HASHED_RULE_INDICES as python_hashed_rules
+
+        return python_hashed_rules
+    else:
+        return set()  # Default to empty set for unsupported languages

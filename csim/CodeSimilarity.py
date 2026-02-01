@@ -1,7 +1,8 @@
 from .python.PythonParser import PythonParser
 from .python.PythonLexer import PythonLexer
 from .Visitors import PythonParserVisitorExtended
-from .utils import TOKEN_TYPE_OFFSET, get_excluded_token_types
+from .utils import TOKEN_TYPE_OFFSET, get_excluded_token_types, get_hash_rule_indices
+import hashlib
 from antlr4 import InputStream, CommonTokenStream, TerminalNode
 from zss import simple_distance, Node
 
@@ -26,7 +27,6 @@ def get_parser_visitor_class(lang):
 
         def __init__(self, excluded_token_types):
             super().__init__()
-            self.node_count = 0
             self.excluded_token_types = excluded_token_types
 
         def visitChildren(self, node):
@@ -45,7 +45,6 @@ def get_parser_visitor_class(lang):
                 if isinstance(child, TerminalNode):
                     token = child.symbol
                     if token.type not in self.excluded_token_types:
-                        self.node_count += 1
                         children_nodes.append(Node(token.type + TOKEN_TYPE_OFFSET))
                 else:
                     result = self.visit(child)
@@ -58,13 +57,66 @@ def get_parser_visitor_class(lang):
                 return children_nodes[0]
 
             # Create parent node for multiple children
-            self.node_count += 1
             parent_node = Node(rule_index)
             for c in children_nodes:
                 parent_node.addkid(c)
             return parent_node
 
     return ParserVisitor
+
+
+def PruneAndHash(tree, lang):
+    """Prune and hash an ANTLR parse tree.
+
+    Args:
+        tree: ANTLR parse tree to prune and hash.
+        lang: The programming language of the source code.
+    Returns:
+        tuple: (pruned_tree, node_count) where pruned_tree is a ZSS Node
+               and node_count is the total number of nodes in the pruned tree.
+    """
+    hashed_rule_indices = get_hash_rule_indices(lang)
+
+    def traverse_subtree(node):
+        # Collect all labels in the subtree rooted at `node` into a single list
+        elements = [node.label]
+        for c in node.children:
+            elements.extend(traverse_subtree(c))
+        return elements
+
+    def hash_children(childrens):
+        # Flatten all children subtree labels into a single sequence and hash
+        flat = []
+        for c in childrens:
+            flat.extend(traverse_subtree(c))
+        s = "|".join(map(str, flat))
+        return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+    def traverse(node):
+        if node is None:
+            return None, 0
+
+        label = node.label
+        new_node = Node(label)
+        count = 1
+        # If this node's label is marked for hashing, replace all its children
+        # with a single hashed-content child.
+        if label in hashed_rule_indices:
+            digest = hash_children(node.children)
+            new_node.addkid(Node(digest))
+            count += 1
+            return new_node, count
+
+        # Otherwise, recurse normally.
+        for children in node.children:
+            new_child, child_count = traverse(children)
+            if new_child is not None:
+                new_node.addkid(new_child)
+                count += child_count
+        return new_node, count
+
+    pruned_tree, pruned_count = traverse(tree)
+    return pruned_tree, pruned_count
 
 
 def Normalize(tree, lang):
@@ -86,7 +138,7 @@ def Normalize(tree, lang):
 
     normalized_tree = visitor.visit(tree)
 
-    return normalized_tree, visitor.node_count
+    return normalized_tree
 
 
 def ANTLR_parse(code, lang):
@@ -171,14 +223,18 @@ def Compare(code_a, code_b, lang="python"):
         T2 = ANTLR_parse(code_b, lang)
 
         # Normalize parse trees and get node counts
-        N1, len_N1 = Normalize(T1, lang)
-        N2, len_N2 = Normalize(T2, lang)
+        NT1 = Normalize(T1, lang)
+        NT2 = Normalize(T2, lang)
+
+        # Prune and hash the normalized tree
+        PT1, len_PT1 = PruneAndHash(NT1, lang)
+        PT2, len_PT2 = PruneAndHash(NT2, lang)
 
         # Compute tree edit distance using Zhang-Shasha algorithm
-        d = simple_distance(N1, N2, label_dist=label_dist)
+        d = simple_distance(PT1, PT2, label_dist=label_dist)
 
         # Calculate and return normalized similarity index
-        s = SimilarityIndex(d, len_N1, len_N2)
+        s = SimilarityIndex(d, len_PT1, len_PT2)
     except Exception as e:
         print(f"Error during comparison: {e}")
         s = None

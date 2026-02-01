@@ -24,6 +24,5 @@ class PythonParserVisitorExtended(PythonParserVisitor):
             and tree.getRuleIndex() in PYTHON_COLLAPSED_RULES
         ):
             list_idx = tree.getRuleIndex()
-            self.node_count += 1
             return Node(list_idx)
         return tree.accept(self)

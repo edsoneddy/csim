@@ -84,6 +84,11 @@ The pruning process involves:
 2. **Identifying Redundant Subtrees:** Subtrees with identical hashes are identified as redundant.
 3. **Pruning Redundant Subtrees:** Redundant subtrees are pruned from the AST, retaining only one instance of each unique subtree.
 
+Excluded rules are considered for prunning are defined as:
+
+```python
+HASHED_RULE_INDICES: set[int]
+```
 
 ### Tree Edit Distance Configuration
 

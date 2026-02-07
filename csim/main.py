@@ -25,7 +25,7 @@ def main():
         "--path",
         "-p",
         type=str,
-        help="Path to the directory containing the source code files",
+        help="Path to the directory containing the source code files. All files in the directory will be compared against each other.",
     )
 
     # Add the 'files' argument to the group

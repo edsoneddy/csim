@@ -5,8 +5,8 @@ setup(
     version="1.4.2",
     packages=find_packages(),
     install_requires=[
-        "antlr4-python3-runtime",
-        "zss",
+        "antlr4-python3-runtime==4.13.2",
+        "zss==1.2.0",
     ],
     author="Eddy Lecoña",
     author_email="crew0eddy@gmail.com",

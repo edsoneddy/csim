@@ -31,6 +31,11 @@ Code Similarity (csim) provide a module designed to detect similarities between 
     pip install .
     ```
 
+### Version Compatibility
+- **Python:** 3.9–3.12 (recommended 3.11)
+- **ANTLR4 Python Runtime:** 4.13.2
+- **zss:** 1.2.0
+
 ## Usage
 csim can be used from the command line. For now, only Python files are supported; more languages will be added in future versions. For example, to compare two Python files, run:
 
@@ -77,6 +82,8 @@ print(f"Similarity: {similarity}") # Output: Similarity: X.XX
 
 ## ANTLR4 Installation and Parser/Lexer Generation
 This installation is not required—the generated files are already included in the project. If you'd like to review the steps to generate them yourself, see [grammars/parser_gen_guide.md](grammars/parser_gen_guide.md).
+
+Note: The included generated files were produced by **ANTLR 4.13.2** and are compatible with the pinned runtime listed above.
 
 ## Contributing
 

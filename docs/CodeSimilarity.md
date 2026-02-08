@@ -12,6 +12,11 @@ between normalized Abstract Syntax Trees (ASTs).
 The ASTs are generated using **ANTLR4** and compared using
 **Zhang–Shasha Tree Edit Distance (ZSS)**.
 
+### Version Baseline
+- **Python:** 3.9–3.12 (recommended 3.11)
+- **ANTLR4 Python Runtime:** 4.13.2
+- **zss:** 1.2.0
+
 To ensure **experimental reproducibility, efficiency, and traceability**,
 the following design decisions are applied.
 

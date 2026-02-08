@@ -178,6 +178,13 @@ def SimilarityIndex(d, T1, T2):
     Returns:
         float: Similarity index in the range [0, 1].
     """
+    # If edit distance exceeds the bound given by max(T1, T2),
+    # normalize by total nodes to keep the value non-negative.
+    if d > max(T1, T2):
+        s_alt = 1 - (d / max(T1 + T2, 1))
+        s_alt = round(s_alt, 2)
+        return s_alt
+
     m = max(T1, T2)
     s = 1 - (d / m)
 

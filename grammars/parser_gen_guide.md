@@ -47,7 +47,7 @@
 ### Generating Python3 Parser and Lexer
 1.  **Download Grammar Files**
 
-    Download the `PythonLexer.g4` and `PythonParser.g4` grammar files from the [ANTLR grammars repository](https://github.com/antlr/grammars-v4/tree/master/python/python3).
+    Download the `PythonLexer.g4` and `PythonParser.g4` grammar files from the [ANTLR grammars repository](https://github.com/antlr/grammars-v4/tree/master/python/python3). Depending on the grammar version you target, paths may vary (e.g., Python 3.13-specific assets live under `python/python3_13`).
 
 2.  **Place Grammar Files**
 
@@ -67,7 +67,7 @@
 
 4.  **Download Lexer Base Class**
 
-    The Python grammar requires a base class for the lexer. Download the `PythonLexerBase.py` file from the repository and place it in the `csim/python` directory. Run the following command from the root of the project:
+    The Python grammar requires a base class for the lexer. Download the `PythonLexerBase.py` file from the repository and place it in the `csim/python` directory. Run the following command from the root of the project (example for Python 3.13):
     ```sh
     curl -o csim/python/PythonLexerBase.py https://raw.githubusercontent.com/antlr/grammars-v4/refs/heads/master/python/python3_13/Python3/PythonLexerBase.py
     ```
@@ -75,5 +75,7 @@
 5.  **Verify Generated Files**
 
     Verify that the generated files (`PythonLexer.py`, `PythonParser.py`, etc.) and the `PythonLexerBase.py` file are present in the `csim/python` directory.
+
+Note: In this project, generated parser/lexer files are already included; regenerating them is optional.
 
 

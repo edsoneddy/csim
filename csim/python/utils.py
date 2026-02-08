@@ -2,14 +2,8 @@ from .PythonParser import PythonParser
 from .PythonLexer import PythonLexer
 from antlr4 import Token
 
+# Excluded Parser Rules and Lexer Tokens
 EXCLUDED_RULE_INDICES = {}
-
-COLLAPSED_RULE_INDICES = {
-    # Lists
-    PythonParser.RULE_list,
-    # Import statements
-    PythonParser.RULE_import_stmt,
-}
 
 EXCLUDED_TOKEN_TYPES = {
     # Punctuation and structural tokens
@@ -36,7 +30,21 @@ EXCLUDED_TOKEN_TYPES = {
     PythonLexer.FINALLY,
 }
 
-HASHED_RULE_INDICES = {
-    PythonParser.RULE_assignment,
+# Collapsed Parser Rules
+COLLAPSED_RULE_INDICES = {
+    PythonParser.RULE_list,  # Lists
+    PythonParser.RULE_import_stmt,  # Import statements
 }
 
+# Hash-Based Pruning
+HASHED_RULE_INDICES = {
+    PythonParser.RULE_assignment,
+    PythonParser.RULE_parameters,
+    PythonParser.RULE_power,
+    PythonParser.RULE_primary,
+    PythonParser.RULE_comparison,
+    PythonParser.RULE_star_targets,
+    PythonParser.RULE_sum,
+    PythonParser.RULE_del_target,
+    PythonParser.RULE_term,
+}

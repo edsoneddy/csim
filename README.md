@@ -46,7 +46,7 @@ csim -f file1.py file2.py
 ```
 ### Output
 ```
-X.XX
+file1.py is similar to file2.py with similarity index: X.XX
 ```
 
 ### Option -p (Specify Directory)
@@ -59,6 +59,7 @@ csim --path /path/to/directory
 file1.py is similar to file2.py with similarity index: X.XX
 file1.py is similar to file3.py with similarity index: X.XX
 ...
+fileN.py is similar to fileM.py with similarity index: X.XX
 ```
 
 Notes:
@@ -76,7 +77,7 @@ Alternatively, you can use csim as a Python module:
 from csim import Compare
 code_a = "a = 5"
 code_b = "c = 50"
-similarity = Compare(code_a, code_b)
+similarity = Compare(name_a = 'example A', content_a = code_a, name_b = 'example B', content_b = code_b)
 print(f"Similarity: {similarity}") # Output: Similarity: X.XX
 ```
 
@@ -113,6 +114,7 @@ For more information on the techniques and tools used in this project, refer to 
 - [Parse Tree (Wikipedia)](https://en.wikipedia.org/wiki/Parse_tree)
 - [Tree Edit Distance (Wikipedia)](https://en.wikipedia.org/wiki/Tree_edit_distance)
 - [zss (PyPI)](https://pypi.org/project/zss/)
+- [Hashing](https://docs.python.org/es/3/library/hashlib.html)
 
 ## Third-Party Licenses
 

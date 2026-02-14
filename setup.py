@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="csim",
-    version="1.5.0",
+    version="1.5.1",
     packages=find_packages(),
     install_requires=[
         "antlr4-python3-runtime==4.13.2",

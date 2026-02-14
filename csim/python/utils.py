@@ -65,4 +65,7 @@ HASHED_RULE_INDICES = {
     PythonParser.RULE_parameters,
     PythonParser.RULE_param,
     PythonParser.RULE_except_block,
+    PythonParser.RULE_decorators,
+    PythonParser.RULE_kwds,
+    PythonParser.RULE_args,
 }

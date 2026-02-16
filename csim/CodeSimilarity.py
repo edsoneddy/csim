@@ -2,7 +2,13 @@ import sys
 from .python.PythonParser import PythonParser
 from .python.PythonLexer import PythonLexer
 from .Visitors import PythonParserVisitorExtended
-from .utils import TOKEN_TYPE_OFFSET, get_excluded_token_types, get_hash_rule_indices
+from .utils import (
+    TOKEN_TYPE_OFFSET,
+    get_control_equivalence_rule_indices,
+    get_exclude_childrens_from_rule,
+    get_excluded_token_types,
+    get_hash_rule_indices,
+)
 import hashlib
 from antlr4 import InputStream, CommonTokenStream, TerminalNode
 from antlr4.error.ErrorListener import ErrorListener
@@ -90,6 +96,8 @@ def PruneAndHash(tree, lang):
                and node_count is the total number of nodes in the pruned tree.
     """
     hashed_rule_indices = get_hash_rule_indices(lang)
+    control_equivalence_rule_indices = get_control_equivalence_rule_indices(lang)
+    exclude_childrens_from_rule = get_exclude_childrens_from_rule(lang)
 
     def traverse_subtree(node):
         # Collect all labels in the subtree rooted at `node` into a single list
@@ -98,31 +106,41 @@ def PruneAndHash(tree, lang):
             elements.extend(traverse_subtree(c))
         return elements
 
-    def hash_children(childrens):
+    def hash_children(label, childrens):
         # Flatten all children subtree labels into a single sequence and hash
         flat = []
         for c in childrens:
             flat.extend(traverse_subtree(c))
         s = "|".join(map(str, flat))
-        return hashlib.sha256(s.encode("utf-8")).hexdigest()
+        return str(label) + "|" + hashlib.sha256(s.encode("utf-8")).hexdigest()
 
     def traverse(node):
         if node is None:
             return None, 0
 
-        label = node.label
-        new_node = Node(label)
         count = 1
-        # If this node's label is marked for hashing, replace all its children
-        # with a single hashed-content child.
-        if label in hashed_rule_indices:
-            digest = hash_children(node.children)
-            new_node.addkid(Node(digest))
-            count += 1
+        label = node.label
+
+        if label in control_equivalence_rule_indices:
+            label = control_equivalence_rule_indices[label]
+
+        if node.label in hashed_rule_indices:
+            digest = hash_children(label, node.children)
+            new_node = Node(digest)
             return new_node, count
+
+        new_node = Node(label)
+
+        # Get the list of child labels to exclude for this rule, if any
+        childrens_to_exclude = exclude_childrens_from_rule.get(node.label, [])
 
         # Otherwise, recurse normally.
         for children in node.children:
+
+            # Skip children that are in the exclusion list for this rule
+            if children.label in childrens_to_exclude:
+                continue
+
             new_child, child_count = traverse(children)
             if new_child is not None:
                 new_node.addkid(new_child)
@@ -130,6 +148,7 @@ def PruneAndHash(tree, lang):
         return new_node, count
 
     pruned_tree, pruned_count = traverse(tree)
+
     return pruned_tree, pruned_count
 
 

@@ -43,16 +43,7 @@ COLLAPSED_RULE_INDICES: set[int]
 
 These rules are collapsed to reduce AST depth and noise. In the current implementation, when a collapsed rule is visited it is replaced by a single node labeled with its `ruleIndex` and its children are not traversed. This creates a compact representation for list-like or syntactically noisy constructs.
 
-#### Excluded Parser Rules and Lexer Tokens
-
-Excluded rules are defined as:
-
-```python
-EXCLUDED_RULE_INDICES: set[int]
-```
-
-Rules are excluded when they do **not contribute meaningful semantic or
-structural information**.
+#### Excluded Lexer Tokens
 
 Excluded tokens are defined as:
 
@@ -61,7 +52,51 @@ EXCLUDED_TOKEN_TYPES: set[int]
 ```
 
 Tokens are excluded when they do **not contribute meaningful semantic or
-structural information**. 
+structural information**.
+
+### Control Flow Equivalence
+
+To enable comparison of structurally equivalent control flow constructs regardless of their syntactic representation, certain rules are mapped to common labels. This allows, for example, `for` and `while` loops to be treated as equivalent "LOOP" constructs during comparison.
+
+Control flow equivalence is defined as:
+
+```python
+CONTROL_EQUIVALENCE_RULE_INDICES: dict[int, str]
+```
+
+This mapping replaces specific rule indices with semantic labels during tree construction. For example:
+
+```python
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    PythonParser.RULE_for_stmt: "LOOP",
+    PythonParser.RULE_while_stmt: "LOOP",
+}
+```
+
+This normalization reduces false differences when comparing code that uses different loop constructs but implements the same logical structure.
+
+### Selective Child Exclusion
+
+Some rules contain children that do not contribute meaningful structural information for comparison purposes. These children can be selectively excluded to reduce noise in the AST.
+
+Excluded children are defined as:
+
+```python
+EXCLUDE_CHILDRENS_FROM_RULE: dict[int, list[int]]
+```
+
+The dictionary maps parent rule indices to lists of child token types that should be excluded. For example:
+
+```python
+EXCLUDE_CHILDRENS_FROM_RULE = {
+    PythonParser.RULE_for_stmt: [
+        PythonLexer.IN + TOKEN_TYPE_OFFSET,
+        PythonLexer.NAME + TOKEN_TYPE_OFFSET,
+    ]
+}
+```
+
+In this example, the `IN` keyword and variable `NAME` tokens are excluded from `for` statements because they represent syntactic noise rather than structural significance. The iteration pattern itself is preserved while removing language-specific tokens that don't affect the logical structure. 
 
 
 ### ZSS Tree Construction
@@ -72,14 +107,21 @@ Each node in the resulting ZSS tree represents one of:
 
 - A **parser rule** (`ruleIndex`)
 - A **relevant lexer token** (`token.type`)
+- A **control flow equivalence label** (string, e.g., "LOOP")
 
-All nodes are labeled using **integer identifiers only**.
+All nodes are labeled using **integer identifiers** or **string labels** for semantically equivalent constructs.
 
-For preventing use the same integer for both rule and token nodes, token types are offset by a constant value.
+To prevent collision between rule indices and token types, token types are offset by a constant value:
 
 ```python
 TOKEN_TYPE_OFFSET = 1000
 ```
+
+During tree construction and pruning, the following transformations are applied:
+
+1. **Control flow equivalence mapping**: Rules defined in `CONTROL_EQUIVALENCE_RULE_INDICES` are replaced with their semantic labels.
+2. **Selective child exclusion**: Children specified in `EXCLUDE_CHILDRENS_FROM_RULE` are filtered out during traversal.
+3. **Hash-based pruning**: Subtrees of rules in `HASHED_RULE_INDICES` are hashed to create compact representations.
 
 ### Hash-Based Pruning
 To optimize tree size while preserving essential structure, a hash-based pruning strategy is employed.
@@ -140,3 +182,6 @@ These design choices provide:
 - Deterministic and reproducible comparisons
 - Clear justification of AST transformations
 - Fine-grained control over abstraction levels
+- Semantic equivalence through control flow normalization
+- Reduced noise through targeted child exclusion
+- Language-agnostic extension points for new languages

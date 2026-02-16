@@ -78,9 +78,9 @@ def get_excluded_token_types(lang):
         set: Set of excluded token types.
     """
     if lang == "python":
-        from .python.utils import EXCLUDED_TOKEN_TYPES as python_excluded
+        from .python.utils import EXCLUDED_TOKEN_TYPES as python_excluded_tokens
 
-        return python_excluded
+        return python_excluded_tokens
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -99,6 +99,38 @@ def get_hash_rule_indices(lang):
     else:
         return set()  # Default to empty set for unsupported languages
 
+
+def get_exclude_childrens_from_rule(lang):
+    """Retrieve excluded rule indices based on the programming language.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        set: Set of excluded rule indices.
+    """
+    if lang == "python":
+        from .python.utils import EXCLUDE_CHILDRENS_FROM_RULE as python_exclude_childrens_from_rule
+
+        return python_exclude_childrens_from_rule
+    else:
+        return set()  # Default to empty set for unsupported languages
+
+def get_control_equivalence_rule_indices(lang):
+    """Retrieve control flow equivalence rule indices based on the programming language.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        dict: Dictionary mapping rule indices to their control flow equivalence labels.
+    """
+    if lang == "python":
+        from .python.utils import CONTROL_EQUIVALENCE_RULE_INDICES as python_control_equivalence_rules
+
+        return python_control_equivalence_rules
+    else:
+        return dict()  # Default to empty dict for unsupported languages
 
 def preprocess_code(file_name, file_content, lang="python"):
     # Local import to avoid circular dependency at module import time

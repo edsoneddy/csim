@@ -2,7 +2,6 @@ from .python.PythonParserVisitor import PythonParserVisitor
 from zss import Node
 from antlr4 import TerminalNode
 from .python.utils import (
-    EXCLUDED_RULE_INDICES as PYTHON_EXCLUDED_RULES,
     COLLAPSED_RULE_INDICES as PYTHON_COLLAPSED_RULES,
 )
 
@@ -15,11 +14,6 @@ class PythonParserVisitorExtended(PythonParserVisitor):
         less relevant constructs.
         """
         if (
-            not isinstance(tree, TerminalNode)
-            and tree.getRuleIndex() in PYTHON_EXCLUDED_RULES
-        ):
-            return None
-        elif (
             not isinstance(tree, TerminalNode)
             and tree.getRuleIndex() in PYTHON_COLLAPSED_RULES
         ):

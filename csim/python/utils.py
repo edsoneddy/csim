@@ -1,3 +1,4 @@
+from csim.utils import TOKEN_TYPE_OFFSET
 from .PythonParser import PythonParser
 from .PythonLexer import PythonLexer
 from antlr4 import Token
@@ -36,8 +37,16 @@ EXCLUDED_TOKEN_TYPES = {
     PythonLexer.WITH,
 }
 
-# Excluded Parser Rules and Lexer Tokens
-EXCLUDED_RULE_INDICES = {}
+
+EXCLUDE_CHILDRENS_FROM_RULE = {
+    PythonParser.RULE_for_stmt: [
+        PythonLexer.IN + TOKEN_TYPE_OFFSET,
+        PythonLexer.NAME + TOKEN_TYPE_OFFSET,
+    ],
+    PythonParser.RULE_function_def_raw: [
+        PythonLexer.NAME + TOKEN_TYPE_OFFSET,
+    ],
+}
 
 # Collapsed Parser Rules
 COLLAPSED_RULE_INDICES = {
@@ -65,4 +74,13 @@ HASHED_RULE_INDICES = {
     PythonParser.RULE_parameters,
     PythonParser.RULE_param,
     PythonParser.RULE_except_block,
+    PythonParser.RULE_decorators,
+    PythonParser.RULE_kwds,
+    PythonParser.RULE_args,
+}
+
+# Rules that are considered equivalent for control flow analysis
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    PythonParser.RULE_for_stmt: "LOOP",
+    PythonParser.RULE_while_stmt: "LOOP",
 }

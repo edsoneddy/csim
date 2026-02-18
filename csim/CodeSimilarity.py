@@ -28,8 +28,11 @@ class ExtendedErrorListener(ErrorListener):
 
 
 def get_parser_visitor_class(lang):
-    """
-    Factory function to create a ParserVisitor class with the correct base visitor.
+    """Factory function to create a ParserVisitor class with the correct base visitor.
+    Args:
+        lang (str): Programming language identifier.
+    Returns:
+        class: A ParserVisitor class that extends the appropriate base visitor for the given language.
     """
     base_visitor = None
     if lang == "python":
@@ -39,10 +42,8 @@ def get_parser_visitor_class(lang):
         raise ValueError(f"Unsupported language: {lang}")
 
     class ParserVisitor(base_visitor):
-        """ParserVisitor pattern implementation for traversing and normalizing ANTLR parse trees.
-
-        Converts the ANTLR parse tree into a normalized ZSS tree structure while
-        compressing redundant nodes and counting total nodes for similarity metrics.
+        """Custom visitor class that extends the base visitor for the specified language.
+        This class can be further customized to implement language-specific normalization logic.
         """
 
         def __init__(self, excluded_token_types):
@@ -71,7 +72,9 @@ def get_parser_visitor_class(lang):
                     if result is not None:
                         children_nodes.append(result)
 
-            # Node compression: simplify tree structure
+            """Node compression: if a node has only one child.
+            Can return the child directly to reduce unnecessary levels in the tree.
+            """
             if len(children_nodes) == 1:
                 # Single child: return it directly to avoid unnecessary nesting
                 return children_nodes[0]
@@ -86,14 +89,14 @@ def get_parser_visitor_class(lang):
 
 
 def PruneAndHash(tree, lang):
-    """Prune and hash an ANTLR parse tree.
+    """Prune and hash a ZSS tree to reduce noise and improve comparison efficiency.
 
     Args:
         tree: ANTLR parse tree to prune and hash.
         lang: The programming language of the source code.
     Returns:
-        tuple: (pruned_tree, node_count) where pruned_tree is a ZSS Node
-               and node_count is the total number of nodes in the pruned tree.
+        tuple: (hashed_tree, node_count) where hashed_tree is a ZSS Node
+               and node_count is the total number of nodes in the tree.
     """
     hashed_rule_indices = get_hash_rule_indices(lang)
     control_equivalence_rule_indices = get_control_equivalence_rule_indices(lang)
@@ -106,6 +109,26 @@ def PruneAndHash(tree, lang):
             elements.extend(traverse_subtree(c))
         return elements
 
+    def prunning_tree(node):
+        if node is None:
+            return None
+
+        label = node.label
+        new_node = Node(label)
+
+        # Get the list of child labels to exclude for this rule, if any
+        childrens_to_exclude = exclude_childrens_from_rule.get(node.label, [])
+
+        # Otherwise, recurse normally.
+        for children in node.children:
+            # Skip children that are in the exclusion list for this rule
+            if children.label in childrens_to_exclude:
+                continue
+            new_child = prunning_tree(children)
+            if new_child is not None:
+                new_node.addkid(new_child)
+        return new_node
+
     def hash_children(label, childrens):
         # Flatten all children subtree labels into a single sequence and hash
         flat = []
@@ -114,54 +137,46 @@ def PruneAndHash(tree, lang):
         s = "|".join(map(str, flat))
         return str(label) + "|" + hashlib.sha256(s.encode("utf-8")).hexdigest()
 
-    def traverse(node):
+    def hashing_tree(node):
         if node is None:
             return None, 0
 
-        count = 1
+        # For control flow nodes, we can consider them equivalent regardless of their specific structure
         label = node.label
-
         if label in control_equivalence_rule_indices:
             label = control_equivalence_rule_indices[label]
 
+        # For nodes that are in the hashed rule set, we hash their entire subtree to a single digest
         if node.label in hashed_rule_indices:
             digest = hash_children(label, node.children)
-            new_node = Node(digest)
-            return new_node, count
+            return Node(digest), 1
 
         new_node = Node(label)
+        count = 1
 
-        # Get the list of child labels to exclude for this rule, if any
-        childrens_to_exclude = exclude_childrens_from_rule.get(node.label, [])
-
-        # Otherwise, recurse normally.
+        # For other nodes, we recursively hash their children as usual
         for children in node.children:
-
-            # Skip children that are in the exclusion list for this rule
-            if children.label in childrens_to_exclude:
-                continue
-
-            new_child, child_count = traverse(children)
+            new_child, child_count = hashing_tree(children)
             if new_child is not None:
                 new_node.addkid(new_child)
                 count += child_count
         return new_node, count
 
-    pruned_tree, pruned_count = traverse(tree)
+    pruned_tree = prunning_tree(tree)
+    hashed_tree, nodes_number = hashing_tree(pruned_tree)
 
-    return pruned_tree, pruned_count
+    return hashed_tree, nodes_number
 
 
 def Normalize(tree, lang):
-    """Normalize an ANTLR parse tree into a ZSS tree structure.
+    """Normalize an ANTLR parse tree to a ZSS tree structure, excluding irrelevant tokens and compressing certain rules.
 
     Args:
         tree: ANTLR parse tree to normalize.
         lang: The programming language of the source code.
 
     Returns:
-        tuple: (normalized_tree, node_count) where normalized_tree is a ZSS Node
-               and node_count is the total number of nodes in the tree.
+        tuple: A ZSS Node representing the normalized tree.
     """
     excluded_token_types = get_excluded_token_types(lang)
 
@@ -176,7 +191,6 @@ def Normalize(tree, lang):
 
 def ANTLR_parse(file_name, file_content, lang):
     """Parse source code into an ANTLR parse tree and handle syntax errors.
-
 
     Args:
         file_name: Name of the source file (used for error reporting).
@@ -256,9 +270,10 @@ def Compare(
 
     The comparison process:
     1. Parse both code snippets into ANTLR parse trees
-    2. Normalize the parse trees into ZSS tree structures
-    3. Compute tree edit distance using Zhang-Shasha algorithm
-    4. Calculate normalized similarity index
+    2. Normalize the parse trees to a ZSS tree structure, excluding irrelevant tokens and collapsing certain rules.
+    3. Prune and hash the normalized trees to reduce noise and improve comparison efficiency.
+    4. Compute the tree edit distance using the Zhang-Shasha algorithm.
+    5. Calculate and return a normalized similarity index based on the edit distance and tree sizes.
 
     Args:
         name_a: Name of the first code snippet (used for error reporting).

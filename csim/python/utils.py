@@ -35,15 +35,20 @@ EXCLUDED_TOKEN_TYPES = {
     PythonLexer.RAISE,
     PythonLexer.GLOBAL,
     PythonLexer.WITH,
+    # Irrelevant tokens
+    PythonLexer.EQUAL,
 }
 
-
+# Rules whose children should be excluded from similarity comparison
 EXCLUDE_CHILDRENS_FROM_RULE = {
     PythonParser.RULE_for_stmt: [
         PythonLexer.IN + TOKEN_TYPE_OFFSET,
         PythonLexer.NAME + TOKEN_TYPE_OFFSET,
     ],
     PythonParser.RULE_function_def_raw: [
+        PythonLexer.NAME + TOKEN_TYPE_OFFSET,
+    ],
+    PythonParser.RULE_assignment: [
         PythonLexer.NAME + TOKEN_TYPE_OFFSET,
     ],
 }
@@ -83,4 +88,63 @@ HASHED_RULE_INDICES = {
 CONTROL_EQUIVALENCE_RULE_INDICES = {
     PythonParser.RULE_for_stmt: "LOOP",
     PythonParser.RULE_while_stmt: "LOOP",
+}
+
+# Specific rule indices for special handling
+RULE_ASSIGNMENT = PythonParser.RULE_assignment
+
+# Augmented assignments mapped to normalized forms
+ASIGN_OP_NORMALIZED = {
+    "+=": [
+        PythonParser.RULE_sum,
+        PythonLexer.PLUS + TOKEN_TYPE_OFFSET,
+    ],
+    "-=": [
+        PythonParser.RULE_sum,
+        PythonLexer.MINUS + TOKEN_TYPE_OFFSET,
+    ],
+    "*=": [
+        PythonParser.RULE_term,
+        PythonLexer.STAR + TOKEN_TYPE_OFFSET,
+    ],
+    "/=": [
+        PythonParser.RULE_term,
+        PythonLexer.SLASH + TOKEN_TYPE_OFFSET,
+    ],
+    "//=": [
+        PythonParser.RULE_term,
+        PythonLexer.DOUBLESLASH + TOKEN_TYPE_OFFSET,
+    ],
+    "%=": [
+        PythonParser.RULE_term,
+        PythonLexer.PERCENT + TOKEN_TYPE_OFFSET,
+    ],
+    "@=": [
+        PythonParser.RULE_term,
+        PythonLexer.AT + TOKEN_TYPE_OFFSET,
+    ],
+    "**=": [
+        PythonParser.RULE_power,
+        PythonLexer.DOUBLESTAR + TOKEN_TYPE_OFFSET,
+    ],
+    "<<=": [
+        PythonParser.RULE_shift_expr,
+        PythonLexer.LEFTSHIFT + TOKEN_TYPE_OFFSET,
+    ],
+    ">>=": [
+        PythonParser.RULE_shift_expr,
+        PythonLexer.RIGHTSHIFT + TOKEN_TYPE_OFFSET,
+    ],
+    "&=": [
+        PythonParser.RULE_bitwise_and,
+        PythonLexer.AMPER + TOKEN_TYPE_OFFSET,
+    ],
+    "^=": [
+        PythonParser.RULE_bitwise_xor,
+        PythonLexer.CIRCUMFLEX + TOKEN_TYPE_OFFSET,
+    ],
+    "|=": [
+        PythonParser.RULE_bitwise_or,
+        PythonLexer.VBAR + TOKEN_TYPE_OFFSET,
+    ],
 }

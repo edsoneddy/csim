@@ -85,19 +85,19 @@ Excluded children are defined as:
 EXCLUDE_CHILDRENS_FROM_RULE: dict[int, list[int]]
 ```
 
-The dictionary maps parent rule indices to lists of child token types that should be excluded. For example:
-
-```python
-EXCLUDE_CHILDRENS_FROM_RULE = {
-    PythonParser.RULE_for_stmt: [
-        PythonLexer.IN + TOKEN_TYPE_OFFSET,
-        PythonLexer.NAME + TOKEN_TYPE_OFFSET,
-    ]
-}
-```
+The dictionary maps parent rule indices to lists of child token types that should be excluded.
 
 In this example, the `IN` keyword and variable `NAME` tokens are excluded from `for` statements because they represent syntactic noise rather than structural significance. The iteration pattern itself is preserved while removing language-specific tokens that don't affect the logical structure. 
 
+### Augmented Assignment Normalization
+
+Augmented assignments are rewritten into a normalized form so equivalent operations compare identically. For example, `i += k` is treated as `i = i + k`. This reduces superficial differences in code that uses different assignment syntax.
+
+The normalization uses a mapping from augmented assignment operators to the parser rule and operator token that represent the equivalent binary operation:
+
+```python
+ASSIGN_OP_NORMALIZED: dict[str, list[int]]
+```
 
 ### ZSS Tree Construction
 

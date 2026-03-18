@@ -1,18 +1,46 @@
+import sys
 from .python.PythonParser import PythonParser
 from .python.PythonLexer import PythonLexer
 from .java.Java20Parser import Java20Parser
 from .java.Java20Lexer import Java20Lexer
-from .cpp.CPP14Lexer import CPP14Lexer
 from .cpp.CPP14Parser import CPP14Parser
-from .Visitors import PythonParserVisitorExtended, Java20ParserVisitorExtended, CPP14ParserVisitorExtended
-from .utils import TOKEN_TYPE_OFFSET, get_excluded_token_types
+from .cpp.CPP14Lexer import CPP14Lexer
+from .Visitors import (
+    PythonParserVisitorExtended,
+    Java20ParserVisitorExtended,
+    CPP14ParserVisitorExtended,
+)
+from .utils import (
+    TOKEN_TYPE_OFFSET,
+    get_control_equivalence_rule_indices,
+    get_exclude_childrens_from_rule,
+    get_excluded_token_types,
+    get_hash_rule_indices,
+)
+import hashlib
 from antlr4 import InputStream, CommonTokenStream, TerminalNode
+from antlr4.error.ErrorListener import ErrorListener
 from zss import simple_distance, Node
 
 
+class ExtendedErrorListener(ErrorListener):
+    def __init__(self, file_name=""):
+        super(ExtendedErrorListener, self).__init__()
+        self.file_name = file_name
+
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        print(
+            f"Syntax error in file {self.file_name} line {line}:{column} {msg}",
+            file=sys.stderr,
+        )
+
+
 def get_parser_visitor_class(lang):
-    """
-    Factory function to create a ParserVisitor class with the correct base visitor.
+    """Factory function to create a ParserVisitor class with the correct base visitor.
+    Args:
+        lang (str): Programming language identifier.
+    Returns:
+        class: A ParserVisitor class that extends the appropriate base visitor for the given language.
     """
     base_visitor = None
     if lang == "python":
@@ -26,15 +54,12 @@ def get_parser_visitor_class(lang):
         raise ValueError(f"Unsupported language: {lang}")
 
     class ParserVisitor(base_visitor):
-        """ParserVisitor pattern implementation for traversing and normalizing ANTLR parse trees.
-
-        Converts the ANTLR parse tree into a normalized ZSS tree structure while
-        compressing redundant nodes and counting total nodes for similarity metrics.
+        """Custom visitor class that extends the base visitor for the specified language.
+        This class can be further customized to implement language-specific normalization logic.
         """
 
         def __init__(self, excluded_token_types):
             super().__init__()
-            self.node_count = 0
             self.excluded_token_types = excluded_token_types
 
         def visitChildren(self, node):
@@ -53,20 +78,20 @@ def get_parser_visitor_class(lang):
                 if isinstance(child, TerminalNode):
                     token = child.symbol
                     if token.type not in self.excluded_token_types:
-                        self.node_count += 1
                         children_nodes.append(Node(token.type + TOKEN_TYPE_OFFSET))
                 else:
                     result = self.visit(child)
                     if result is not None:
                         children_nodes.append(result)
 
-            # Node compression: simplify tree structure
+            """Node compression: if a node has only one child.
+            Can return the child directly to reduce unnecessary levels in the tree.
+            """
             if len(children_nodes) == 1:
                 # Single child: return it directly to avoid unnecessary nesting
                 return children_nodes[0]
 
             # Create parent node for multiple children
-            self.node_count += 1
             parent_node = Node(rule_index)
             for c in children_nodes:
                 parent_node.addkid(c)
@@ -75,16 +100,95 @@ def get_parser_visitor_class(lang):
     return ParserVisitor
 
 
+def PruneAndHash(tree, lang):
+    """Prune and hash a ZSS tree to reduce noise and improve comparison efficiency.
+
+    Args:
+        tree: ANTLR parse tree to prune and hash.
+        lang: The programming language of the source code.
+    Returns:
+        tuple: (hashed_tree, node_count) where hashed_tree is a ZSS Node
+               and node_count is the total number of nodes in the tree.
+    """
+    hashed_rule_indices = get_hash_rule_indices(lang)
+    control_equivalence_rule_indices = get_control_equivalence_rule_indices(lang)
+    exclude_childrens_from_rule = get_exclude_childrens_from_rule(lang)
+
+    def traverse_subtree(node):
+        # Collect all labels in the subtree rooted at `node` into a single list
+        elements = [node.label]
+        for c in node.children:
+            elements.extend(traverse_subtree(c))
+        return elements
+
+    def prunning_tree(node):
+        if node is None:
+            return None
+
+        label = node.label
+        new_node = Node(label)
+
+        # Get the list of child labels to exclude for this rule, if any
+        childrens_to_exclude = exclude_childrens_from_rule.get(node.label, [])
+
+        # Otherwise, recurse normally.
+        for children in node.children:
+            # Skip children that are in the exclusion list for this rule
+            if children.label in childrens_to_exclude:
+                continue
+            new_child = prunning_tree(children)
+            if new_child is not None:
+                new_node.addkid(new_child)
+        return new_node
+
+    def hash_children(label, childrens):
+        # Flatten all children subtree labels into a single sequence and hash
+        flat = []
+        for c in childrens:
+            flat.extend(traverse_subtree(c))
+        s = "|".join(map(str, flat))
+        return str(label) + "|" + hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+    def hashing_tree(node):
+        if node is None:
+            return None, 0
+
+        # For control flow nodes, we can consider them equivalent regardless of their specific structure
+        label = node.label
+        if label in control_equivalence_rule_indices:
+            label = control_equivalence_rule_indices[label]
+
+        # For nodes that are in the hashed rule set, we hash their entire subtree to a single digest
+        if node.label in hashed_rule_indices:
+            digest = hash_children(label, node.children)
+            return Node(digest), 1
+
+        new_node = Node(label)
+        count = 1
+
+        # For other nodes, we recursively hash their children as usual
+        for children in node.children:
+            new_child, child_count = hashing_tree(children)
+            if new_child is not None:
+                new_node.addkid(new_child)
+                count += child_count
+        return new_node, count
+
+    pruned_tree = prunning_tree(tree)
+    hashed_tree, nodes_number = hashing_tree(pruned_tree)
+
+    return hashed_tree, nodes_number
+
+
 def Normalize(tree, lang):
-    """Normalize an ANTLR parse tree into a ZSS tree structure.
+    """Normalize an ANTLR parse tree to a ZSS tree structure, excluding irrelevant tokens and compressing certain rules.
 
     Args:
         tree: ANTLR parse tree to normalize.
         lang: The programming language of the source code.
 
     Returns:
-        tuple: (normalized_tree, node_count) where normalized_tree is a ZSS Node
-               and node_count is the total number of nodes in the tree.
+        tuple: A ZSS Node representing the normalized tree.
     """
     excluded_token_types = get_excluded_token_types(lang)
 
@@ -94,40 +198,93 @@ def Normalize(tree, lang):
 
     normalized_tree = visitor.visit(tree)
 
-    return normalized_tree, visitor.node_count
+    return normalized_tree
 
 
-def ANTLR_parse(code, lang):
-    """Parse source code into an ANTLR parse tree.
+def ANTLR_parse(file_name, file_content, lang):
+    """Parse source code into an ANTLR parse tree and handle syntax errors.
 
     Args:
-        code: source code as a string.
+        file_name: Name of the source file (used for error reporting).
+        file_content: Source code as a string to be parsed.
         lang: programming language of the source code (e.g. python, java, etc.).
 
     Returns:
         ANTLR parse tree representing the code's syntactic structure.
     """
+
     tree = None
     parser = None
-    input_stream = InputStream(code)
+    input_stream = InputStream(file_content)
+    error_listener = ExtendedErrorListener(file_name)
 
     if lang == "python":
+        # Lexing the input code to create a token stream
         lexer = PythonLexer(input_stream)
+        lexer.removeErrorListeners()
+        lexer.addErrorListener(error_listener)
+        # Parsing the token stream to create a parse tree
         token_stream = CommonTokenStream(lexer)
         parser = PythonParser(token_stream)
+        parser.removeErrorListeners()
+        parser.addErrorListener(error_listener)
         tree = parser.file_input()
     elif lang == "java":
+        # Lexing the input code to create a token stream
         lexer = Java20Lexer(input_stream)
+        lexer.removeErrorListeners()
+        lexer.addErrorListener(error_listener)
+        # Parsing the token stream to create a parse tree
         token_stream = CommonTokenStream(lexer)
         parser = Java20Parser(token_stream)
+        parser.removeErrorListeners()
+        parser.addErrorListener(error_listener)
         tree = parser.compilationUnit()
     elif lang == "cpp":
+        # Lexing the input code to create a token stream
         lexer = CPP14Lexer(input_stream)
+        lexer.removeErrorListeners()
+        lexer.addErrorListener(error_listener)
+        # Parsing the token stream to create a parse tree
         token_stream = CommonTokenStream(lexer)
         parser = CPP14Parser(token_stream)
+        parser.removeErrorListeners()
+        parser.addErrorListener(error_listener)
         tree = parser.translationUnit()
 
     return tree
+
+
+def TreeEditDistance(N1, N2, ted_algorithm="zss"):
+    """Calculate the tree edit distance between two trees using the specified algorithm.
+    Args:
+        N1: First tree (root node).
+        N2: Second tree (root node).
+        ted_algorithm: The tree edit distance algorithm to use ('zss' or 'apted').
+    Returns:
+        int: The computed tree edit distance between the two trees.
+    """
+    if ted_algorithm == "zss":
+        from zss import simple_distance
+
+        d = simple_distance(N1, N2)
+    elif ted_algorithm == "apted":
+        from apted import APTED, Config
+
+        class CustomConfig(Config):
+            def rename(self, node1, node2):
+                """Compares attribute .value of trees"""
+                return 1 if node1.label != node2.label else 0
+
+            def children(self, node):
+                """Get childrens of a node"""
+                return node.children
+
+        apted = APTED(N1, N2, CustomConfig())
+        d = apted.compute_edit_distance()
+    else:
+        d = 0
+    return d
 
 
 def SimilarityIndex(d, T1, T2):
@@ -144,6 +301,13 @@ def SimilarityIndex(d, T1, T2):
     Returns:
         float: Similarity index in the range [0, 1].
     """
+    # If edit distance exceeds the bound given by max(T1, T2),
+    # normalize by total nodes to keep the value non-negative.
+    if d > max(T1, T2):
+        s_alt = 1 - (d / max(T1 + T2, 1))
+        s_alt = round(s_alt, 2)
+        return s_alt
+
     m = max(T1, T2)
     s = 1 - (d / m)
 
@@ -152,32 +316,30 @@ def SimilarityIndex(d, T1, T2):
     return s
 
 
-def label_dist(a, b):
-    """Calculate the distance between two tree nodes for ZSS algorithm.
-
-    Args:
-        a: label of node a.
-        b: label of node b.
-
-    Returns:
-        int: 0 if nodes match (or subtrees are identical), 1 otherwise.
-    """
-    return 0 if a == b else 1
-
-
-def Compare(code_a, code_b, lang="python"):
+def Compare(
+    name_a="Snippet A",
+    content_a="",
+    name_b="Snippet B",
+    content_b="",
+    lang="python",
+    ted_algorithm="zss",
+):
     """Compare two Python code snippets and compute their similarity.
 
     The comparison process:
     1. Parse both code snippets into ANTLR parse trees
-    2. Normalize the parse trees into ZSS tree structures
-    3. Compute tree edit distance using Zhang-Shasha algorithm
-    4. Calculate normalized similarity index
+    2. Normalize the parse trees to a ZSS tree structure, excluding irrelevant tokens and collapsing certain rules.
+    3. Prune and hash the normalized trees to reduce noise and improve comparison efficiency.
+    4. Compute the tree edit distance using the specified algorithm (e.g., ZSS or APTED).
+    5. Calculate and return a normalized similarity index based on the edit distance and tree sizes.
 
     Args:
-        code_a: First Python code snippet as a string.
-        code_b: Second Python code snippet as a string.
-
+        name_a: Name of the first code snippet (used for error reporting).
+        content_a: First Python code snippet as a string.
+        name_b: Name of the second code snippet (used for error reporting).
+        content_b: Second Python code snippet as a string.
+        lang: Programming language of the code snippets (default is "python").
+        ted_algorithm: The tree edit distance algorithm to use ('zss' or 'apted').
     Returns:
         float: Similarity score in the range [0, 1], where 1 indicates
                identical code structure and 0 indicates maximum difference.
@@ -185,18 +347,22 @@ def Compare(code_a, code_b, lang="python"):
 
     try:
         # Parse both code snippets into ANTLR parse trees
-        T1 = ANTLR_parse(code_a, lang)
-        T2 = ANTLR_parse(code_b, lang)
+        T1 = ANTLR_parse(name_a, content_a, lang)
+        T2 = ANTLR_parse(name_b, content_b, lang)
 
         # Normalize parse trees and get node counts
-        N1, len_N1 = Normalize(T1, lang)
-        N2, len_N2 = Normalize(T2, lang)
+        NT1 = Normalize(T1, lang)
+        NT2 = Normalize(T2, lang)
 
-        # Compute tree edit distance using Zhang-Shasha algorithm
-        d = simple_distance(N1, N2, label_dist=label_dist)
+        # Prune and hash the normalized tree
+        PT1, len_PT1 = PruneAndHash(NT1, lang)
+        PT2, len_PT2 = PruneAndHash(NT2, lang)
+
+        # Compute tree edit distance using the specified algorithm
+        d = TreeEditDistance(PT1, PT2, ted_algorithm=ted_algorithm)
 
         # Calculate and return normalized similarity index
-        s = SimilarityIndex(d, len_N1, len_N2)
+        s = SimilarityIndex(d, len_PT1, len_PT2)
     except Exception as e:
         print(f"Error during comparison: {e}")
         s = None

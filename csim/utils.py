@@ -1,5 +1,21 @@
 import argparse
 from pathlib import Path
+import os
+from .DataStructures import UFDS as UnionFind
+
+
+def get_file(file_path):
+    if not Path(file_path).is_file():
+        raise argparse.ArgumentTypeError(f"File '{file_path}' does not exist.")
+    return file_path
+
+
+def print_tree(node, indent=0):
+    if node is None:
+        return
+    print("   " * indent + str(node.label))
+    for child in node.children:
+        print_tree(child, indent + 1)
 
 
 def print_tree(node, indent=0):
@@ -26,13 +42,27 @@ def read_file(file_path):
         return file_path, None
 
 
-def process_files(args):
+def process_files(path, files):
     # Storage for file names and contents
     file_names = []
     file_contents = []
+
     # Process the files based on the provided arguments
-    if args.files is not None:
-        file1, file2 = args.files
+    if path:
+        # Check if the path is a valid directory
+        if not os.path.isdir(path):
+            print(f"Error: The path '{path}' is not a valid directory.")
+            return file_names, file_contents
+        # Process the files in the directory
+        for file in os.listdir(path):
+            file_path = os.path.join(path, file)
+            if os.path.isfile(file_path) and file.endswith(".py"):
+                file_name, content = read_file(file_path)
+                # Store the file name and content
+                file_names.append(file_name)
+                file_contents.append(content)
+    elif files:
+        file1, file2 = files
         file_name1, content1 = read_file(file1)
         file_name2, content2 = read_file(file2)
         # Store the file name and content
@@ -57,12 +87,199 @@ def get_excluded_token_types(lang):
     """
     if lang == "python":
         from .python.utils import EXCLUDED_TOKEN_TYPES as python_excluded
+
         return python_excluded
     elif lang == "java":
         from .java.utils import EXCLUDED_TOKEN_TYPES as java_excluded
+
         return java_excluded
     elif lang == "cpp":
         from .cpp.utils import EXCLUDED_TOKEN_TYPES as cpp_excluded
+
         return cpp_excluded
     else:
         return set()  # Default to empty set for unsupported languages
+
+
+def get_hash_rule_indices(lang):
+    """Retrieve hashed rule indices based on the programming language.
+    Args:
+        lang (str): Programming language identifier.
+    Returns:
+        set: Set of hashed rule indices.
+    """
+    if lang == "python":
+        from .python.utils import HASHED_RULE_INDICES as python_hashed_rules
+
+        return python_hashed_rules
+    else:
+        return set()  # Default to empty set for unsupported languages
+
+
+def get_exclude_childrens_from_rule(lang):
+    """Retrieve rule indices whose children should be excluded from similarity comparison based on the programming language.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        set: Set of rule indices whose children should be excluded from similarity comparison.
+    """
+    if lang == "python":
+        from .python.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as python_exclude_childrens_from_rule,
+        )
+
+        return python_exclude_childrens_from_rule
+    else:
+        return dict()  # Default to empty dict for unsupported languages
+
+
+def get_control_equivalence_rule_indices(lang):
+    """Retrieve control equivalence rule indices based on the programming language.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        dict: Dictionary mapping rule indices to their equivalence classes for control flow analysis.
+    """
+    if lang == "python":
+        from .python.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as python_control_equivalence_rules,
+        )
+
+        return python_control_equivalence_rules
+    else:
+        return dict()  # Default to empty dict for unsupported languages
+
+
+def preprocess_code(file_name, file_content, lang="python"):
+    # Local import to avoid circular dependency at module import time
+    from .CodeSimilarity import ANTLR_parse, Normalize, PruneAndHash
+
+    T1 = ANTLR_parse(file_name, file_content, lang)
+    normalized_tree = Normalize(T1, lang)
+    pruned_tree, pruned_count = PruneAndHash(normalized_tree, lang)
+
+    return pruned_tree, pruned_count
+
+
+def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):
+    N1, len_N1 = proccesed_code1
+    N2, len_N2 = proccesed_code2
+
+    # Local import to avoid circular dependency at module import time
+    from .CodeSimilarity import SimilarityIndex, TreeEditDistance
+
+    d = TreeEditDistance(N1, N2, ted_algorithm)
+    result = SimilarityIndex(d, len_N1, len_N2)
+    return result
+
+
+def compare_all(file_names, file_contents, lang, ted_algorithm):
+
+    file_number = len(file_names)
+    proccesed_files = [
+        preprocess_code(file_names[idx], file_contents[idx], lang)
+        for idx in range(file_number)
+    ]
+
+    # Create a matrix to store similarity percentages
+    similarity_matrix = [
+        [None for _ in range(file_number + 1)] for _ in range(file_number + 1)
+    ]
+
+    # Fill the first row and first column with file names
+    for i in range(file_number):
+        similarity_matrix[0][i + 1] = file_names[i].split("/")[-1].replace(".py", "")
+        similarity_matrix[i + 1][0] = file_names[i].split("/")[-1].replace(".py", "")
+
+    results = []
+    # Calculate similarity percentages and fill the matrix
+    for i in range(file_number):
+        file_a = proccesed_files[i]
+        for j in range(file_number):
+            if similarity_matrix[i + 1][j + 1] != None:
+                continue
+            elif i == j:
+                similarity_matrix[i + 1][j + 1] = 1.00
+            else:
+                file_b = proccesed_files[j]
+                similarity_index = get_similarity_coefficient(
+                    file_a, file_b, ted_algorithm
+                )
+                similarity_matrix[i + 1][j + 1] = round(similarity_index, 2)
+                similarity_matrix[j + 1][i + 1] = round(similarity_index, 2)
+                results.append(
+                    f"{file_names[i]} is similar to {file_names[j]} with similarity index: {similarity_index}"
+                )
+
+    return "\n".join(results)
+
+
+def get_output_by_group(file_names, groups, similarity_indices, threshold):
+    result = []
+    unique_files = []
+
+    result.append(f"Threshold: {threshold}")
+    result.append(f"Total files processed: {len(file_names)}")
+
+    groups_cnt = 1
+    for file_group in groups:
+        if len(file_group) > 1:
+            avg_similarity = sum(
+                similarity_indices[file] for file in file_group[1:]
+            ) / (len(file_group) - 1)
+            result.append(
+                f"Group {groups_cnt} (Average Similarity: {avg_similarity:.2f}):"
+            )
+            result.extend([file_names[file] for file in file_group])
+            groups_cnt += 1
+        else:
+            unique_files.append(file_names[file_group[0]])
+
+    if unique_files:
+        result.append(f"Unique Files (similarity below threshold):")
+        for file in unique_files:
+            result.append(file)
+
+    return "\n".join(result)
+
+
+def group_by_similarity(file_names, file_contents, lang, threshold, ted_algorithm):
+
+    file_number = len(file_names)
+    grouper = UnionFind(file_number)
+
+    proccesed_files = [
+        preprocess_code(file_names[idx], file_contents[idx], lang)
+        for idx in range(file_number)
+    ]
+
+    similarity_indices = [0.00] * file_number
+
+    for i in range(file_number - 1):
+        if grouper.find(i) == i:
+            file_a = proccesed_files[i]
+            for j in range(i + 1, file_number):
+                if grouper.find(j) == j:
+                    file_b = proccesed_files[j]
+                    similarity_index = get_similarity_coefficient(
+                        file_a, file_b, ted_algorithm
+                    )
+                    if similarity_index > threshold:
+                        grouper.union(i, j)
+                        similarity_indices[j] = similarity_index
+
+    groups = {}
+
+    for i in range(file_number):
+        root = grouper.find(i)
+        if root not in groups:
+            groups[root] = []
+        groups[root].append(i)
+
+    groups = list(groups.values())
+
+    return get_output_by_group(file_names, groups, similarity_indices, threshold)

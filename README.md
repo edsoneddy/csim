@@ -39,23 +39,6 @@ Alternatively, you can install it directly from PyPI:
 pip install csim
 ```
 
-## Usage
-csim can be used from the command line, supports Python, Java and Cpp source code files. You can specify the language using the `-lang` option. By default `python` is assumed.
-
-For Python files, use:
-```sh
-csim -f file1.py file2.py -lang python
-```
-
-For Java files, use:
-```sh
-csim -f file1.java file2.java -lang java
-```
-
-For Cpp files, use:
-```sh
-csim -f file1.cpp file2.cpp -lang cpp
-```
 
 ### Version Compatibility
 - **Python:** 3.9–3.12 (recommended 3.11)
@@ -96,9 +79,21 @@ Notes:
 - The output uses full file paths when reporting similarities.
 
 ### Option --lang (Specify Language)
-You can specify the input language. Currently, only `python` is supported and it is the default.
+csim can be used from the command line, supports Python, Java and Cpp source code files. You can specify the language using the `-lang` option. By default `python` is assumed.
+
+For Python files, use:
 ```sh
-csim --files file1.py file2.py --lang python
+csim -f file1.py file2.py -lang python
+```
+
+For Java files, use:
+```sh
+csim -f file1.java file2.java -lang java
+```
+
+For Cpp files, use:
+```sh
+csim -f file1.cpp file2.cpp -lang cpp
 ```
 
 ### Option --threshold (Specify Similarity Threshold)

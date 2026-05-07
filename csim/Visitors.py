@@ -1,7 +1,6 @@
 from .python.PythonParserVisitor import PythonParserVisitor
 from .java.Java20ParserVisitor import Java20ParserVisitor
 from .cpp.CPP14ParserVisitor import CPP14ParserVisitor
-from zss import Node
 from antlr4 import TerminalNode
 from .java.utils import (
     COLLAPSED_RULE_INDICES as JAVA_COLLAPSED_RULES,
@@ -17,7 +16,6 @@ from .cpp.utils import (
 
 
 class PythonParserVisitorExtended(PythonParserVisitor):
-
     def visit(self, tree):
         """Override visit to exclude certain rules from being processed.
         This helps in reducing noise in the parse tree by skipping over
@@ -27,8 +25,7 @@ class PythonParserVisitorExtended(PythonParserVisitor):
             not isinstance(tree, TerminalNode)
             and tree.getRuleIndex() in PYTHON_COLLAPSED_RULES
         ):
-            list_idx = tree.getRuleIndex()
-            return Node(list_idx)
+            return {"label": tree.getRuleIndex(), "children": []}
         return tree.accept(self)
 
     def visitAssignment(self, node):
@@ -40,12 +37,12 @@ class PythonParserVisitorExtended(PythonParserVisitor):
         if operand in PYTHON_ASSIGN_OP_NORMALIZED:
             # Rewrite the assignment to a normalized form based on the operator
             rule, operator_token = PYTHON_ASSIGN_OP_NORMALIZED[operand]
-            assignment_node = Node(PYTHON_RULE_ASSIGNMENT)
-            norm_node = Node(rule)
-            norm_node.addkid(self.visit(node.getChild(0)))
-            norm_node.addkid(Node(operator_token))
-            norm_node.addkid(self.visit(node.getChild(2)))
-            assignment_node.addkid(norm_node)
+            assignment_node = {"label": PYTHON_RULE_ASSIGNMENT, "children": []}
+            norm_node = {"label": rule, "children": []}
+            norm_node["children"].append(self.visit(node.getChild(0)))
+            norm_node["children"].append({"label": operator_token, "children": []})
+            norm_node["children"].append(self.visit(node.getChild(2)))
+            assignment_node["children"].append(norm_node)
             return assignment_node
         else:
             # For regular assignment, just visit the children as usual
@@ -53,7 +50,6 @@ class PythonParserVisitorExtended(PythonParserVisitor):
 
 
 class Java20ParserVisitorExtended(Java20ParserVisitor):
-
     def visit(self, tree):
         """Override visit to exclude certain rules from being processed.
         This helps in reducing noise in the parse tree by skipping over
@@ -63,13 +59,11 @@ class Java20ParserVisitorExtended(Java20ParserVisitor):
             not isinstance(tree, TerminalNode)
             and tree.getRuleIndex() in JAVA_COLLAPSED_RULES
         ):
-            list_idx = tree.getRuleIndex()
-            return Node(list_idx)
+            return {"label": tree.getRuleIndex(), "children": []}
         return tree.accept(self)
 
 
 class CPP14ParserVisitorExtended(CPP14ParserVisitor):
-
     def visit(self, tree):
         """Override visit to exclude certain rules from being processed.
         This helps in reducing noise in the parse tree by skipping over
@@ -79,6 +73,5 @@ class CPP14ParserVisitorExtended(CPP14ParserVisitor):
             not isinstance(tree, TerminalNode)
             and tree.getRuleIndex() in CPP_COLLAPSED_RULES
         ):
-            list_idx = tree.getRuleIndex()
-            return Node(list_idx)
+            return {"label": tree.getRuleIndex(), "children": []}
         return tree.accept(self)

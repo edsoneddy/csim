@@ -20,7 +20,7 @@ from .utils import (
 import hashlib
 from antlr4 import InputStream, CommonTokenStream, TerminalNode
 from antlr4.error.ErrorListener import ErrorListener
-from zss import simple_distance, Node
+from zss import simple_distance
 
 
 class ExtendedErrorListener(ErrorListener):
@@ -69,7 +69,7 @@ def get_parser_visitor_class(lang):
                 node: ANTLR parse tree node to process.
 
             Returns:
-                A ZSS Node representing the normalized subtree.
+                A dictionary representing the normalized subtree.
             """
             rule_index = node.getRuleIndex()
             children_nodes = []
@@ -78,7 +78,12 @@ def get_parser_visitor_class(lang):
                 if isinstance(child, TerminalNode):
                     token = child.symbol
                     if token.type not in self.excluded_token_types:
-                        children_nodes.append(Node(token.type + TOKEN_TYPE_OFFSET))
+                        children_nodes.append(
+                            {
+                                "label": token.type + TOKEN_TYPE_OFFSET,
+                                "children": [],
+                            }
+                        )
                 else:
                     result = self.visit(child)
                     if result is not None:
@@ -92,22 +97,19 @@ def get_parser_visitor_class(lang):
                 return children_nodes[0]
 
             # Create parent node for multiple children
-            parent_node = Node(rule_index)
-            for c in children_nodes:
-                parent_node.addkid(c)
-            return parent_node
+            return {"label": rule_index, "children": children_nodes}
 
     return ParserVisitor
 
 
 def PruneAndHash(tree, lang):
-    """Prune and hash a ZSS tree to reduce noise and improve comparison efficiency.
+    """Prune and hash a tree to reduce noise and improve comparison efficiency.
 
     Args:
-        tree: ANTLR parse tree to prune and hash.
+        tree: A dictionary-based tree to prune and hash.
         lang: The programming language of the source code.
     Returns:
-        tuple: (hashed_tree, node_count) where hashed_tree is a ZSS Node
+        tuple: (hashed_tree, node_count) where hashed_tree is a dictionary
                and node_count is the total number of nodes in the tree.
     """
     hashed_rule_indices = get_hash_rule_indices(lang)
@@ -116,8 +118,8 @@ def PruneAndHash(tree, lang):
 
     def traverse_subtree(node):
         # Collect all labels in the subtree rooted at `node` into a single list
-        elements = [node.label]
-        for c in node.children:
+        elements = [node["label"]]
+        for c in node["children"]:
             elements.extend(traverse_subtree(c))
         return elements
 
@@ -125,20 +127,20 @@ def PruneAndHash(tree, lang):
         if node is None:
             return None
 
-        label = node.label
-        new_node = Node(label)
+        label = node["label"]
+        new_node = {"label": label, "children": []}
 
         # Get the list of child labels to exclude for this rule, if any
-        childrens_to_exclude = exclude_childrens_from_rule.get(node.label, [])
+        childrens_to_exclude = exclude_childrens_from_rule.get(label, [])
 
         # Otherwise, recurse normally.
-        for children in node.children:
+        for children in node["children"]:
             # Skip children that are in the exclusion list for this rule
-            if children.label in childrens_to_exclude:
+            if children["label"] in childrens_to_exclude:
                 continue
             new_child = prunning_tree(children)
             if new_child is not None:
-                new_node.addkid(new_child)
+                new_node["children"].append(new_child)
         return new_node
 
     def hash_children(label, childrens):
@@ -154,23 +156,23 @@ def PruneAndHash(tree, lang):
             return None, 0
 
         # For control flow nodes, we can consider them equivalent regardless of their specific structure
-        label = node.label
+        label = node["label"]
         if label in control_equivalence_rule_indices:
             label = control_equivalence_rule_indices[label]
 
         # For nodes that are in the hashed rule set, we hash their entire subtree to a single digest
-        if node.label in hashed_rule_indices:
-            digest = hash_children(label, node.children)
-            return Node(digest), 1
+        if node["label"] in hashed_rule_indices:
+            digest = hash_children(label, node["children"])
+            return {"label": digest, "children": []}, 1
 
-        new_node = Node(label)
+        new_node = {"label": label, "children": []}
         count = 1
 
         # For other nodes, we recursively hash their children as usual
-        for children in node.children:
+        for children in node["children"]:
             new_child, child_count = hashing_tree(children)
             if new_child is not None:
-                new_node.addkid(new_child)
+                new_node["children"].append(new_child)
                 count += child_count
         return new_node, count
 
@@ -265,22 +267,36 @@ def TreeEditDistance(N1, N2, ted_algorithm="zss"):
         int: The computed tree edit distance between the two trees.
     """
     if ted_algorithm == "zss":
-        from zss import simple_distance
+        # Custom configuration for zss to work with dictionaries
+        class CustomConfigZss:
+            @staticmethod
+            def get_children(node):
+                return node["children"]
 
-        d = simple_distance(N1, N2)
+            @staticmethod
+            def get_label(node):
+                return node["label"]
+
+        d = simple_distance(
+            N1,
+            N2,
+            get_children=CustomConfigZss.get_children,
+            get_label=CustomConfigZss.get_label,
+        )
     elif ted_algorithm == "apted":
         from apted import APTED, Config
 
-        class CustomConfig(Config):
+        # Custom configuration for APTED to work with dictionaries
+        class CustomConfigApted(Config):
             def rename(self, node1, node2):
                 """Compares attribute .value of trees"""
-                return 1 if node1.label != node2.label else 0
+                return 1 if node1["label"] != node2["label"] else 0
 
             def children(self, node):
                 """Get childrens of a node"""
-                return node.children
+                return node["children"]
 
-        apted = APTED(N1, N2, CustomConfig())
+        apted = APTED(N1, N2, CustomConfigApted())
         d = apted.compute_edit_distance()
     else:
         d = 0

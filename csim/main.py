@@ -15,82 +15,72 @@ def main():
     Returns:
         None
     """
-    # Create the argument parser
     parser = argparse.ArgumentParser(
-        description="Compare two source code files for similarity."
+        description="A command-line tool to compare source code files for similarity."
     )
 
-    # Create a mutually exclusive group
-    group = parser.add_mutually_exclusive_group(required=True)
-
-    # Add the 'path' argument to the group
-    group.add_argument(
+    # A mutually exclusive group for specifying the source of files
+    source_group = parser.add_mutually_exclusive_group(required=True)
+    source_group.add_argument(
         "--path",
         "-p",
         type=str,
-        help="Path to the directory containing the source code files to compare.",
+        help="Path to a directory containing source code files. Cannot be used with --files.",
     )
-
-    # Add the 'files' argument to the group
-    parser.add_argument(
+    source_group.add_argument(
         "--files",
         "-f",
         nargs=2,
         metavar=("FILE1", "FILE2"),
-        help="The two source code files to compare.",
-        required=True,
+        help="Two specific source code files to compare. Cannot be used with --path.",
     )
 
-    # Add the 'lang' argument to the group
+    # Language of the source files
     parser.add_argument(
         "--lang",
         "-l",
         choices=["python", "java", "cpp"],
         default="python",
-        help="The programming language of the source files. Defaults to 'python'.",
+        help="The programming language of the source files (default: python).",
     )
 
-    # Add the 'lang' argument to the group
-    parser.add_argument(
-        "--lang",
-        "-l",
-        choices=["python"],
-        default="python",
-        help="The programming language of the source files. Defaults to 'python'.",
-    )
-
-    # Optional threshold used only when --path is selected
+    # Optional threshold, only valid when --path is used
     parser.add_argument(
         "--threshold",
         "-t",
         type=float,
-        help="Similarity threshold between 0.0 and 1.0. Only valid when used with --path/-p option.",
+        default=None,
+        help="Similarity threshold (0.0 to 1.0) for grouping files. Only valid with --path.",
     )
 
-    # Optional argument for tree edit distance algorithm
+    # Algorithm for tree edit distance
     parser.add_argument(
         "--talg",
         "-ta",
         choices=["zss", "apted"],
         default="zss",
-        help="The tree edit distance algorithm to use. Defaults to 'zss'.",
+        help="The tree edit distance algorithm to use (default: zss).",
     )
 
-    # Parse the arguments
     args = parser.parse_args()
 
-    # Validate conditional use of --threshold: only allowed with --path
+    # Validate that --threshold is only used with --path
     if args.threshold is not None:
         if not args.path:
-            parser.error("argument --threshold: can only be used with --path/-p")
+            parser.error("The --threshold argument can only be used with --path.")
         if not (0.0 <= args.threshold <= 1.0):
-            parser.error("argument --threshold: must be between 0.0 and 1.0")
+            parser.error("The --threshold must be a float between 0.0 and 1.0.")
 
-    # Process the files
-    file_names, file_contents = process_files(args.path, args.files)
-
+    # Process files based on the provided arguments
     try:
-        if len(file_names) >= 2:
+        file_names, file_contents = process_files(args.path, args.files)
+
+        if len(file_names) < 2:
+            print("Error: At least two files are required for comparison.")
+            return
+
+        if args.path:
+            # When a path is provided, compare all files and group by similarity if a threshold is set
             if args.threshold is not None:
                 results = group_by_similarity(
                     file_names, file_contents, args.lang, args.threshold, args.talg
@@ -98,10 +88,12 @@ def main():
             else:
                 results = compare_all(file_names, file_contents, args.lang, args.talg)
         else:
-            results = "Please provide at least two files for comparison."
+            # When two files are provided directly
+            results = compare_all(file_names, file_contents, args.lang, args.talg)
+
         print(results)
     except Exception as e:
-        print(f"An error occurred during comparison: {e}")
+        print(f"An error occurred: {e}")
 
 
 if __name__ == "__main__":

@@ -13,8 +13,8 @@ def get_file(file_path):
 def print_tree(node, indent=0):
     if node is None:
         return
-    print("   " * indent + str(node.label))
-    for child in node.children:
+    print("   " * indent + str(node["label"]))
+    for child in node["children"]:
         print_tree(child, indent + 1)
 
 

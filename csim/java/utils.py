@@ -17,7 +17,6 @@ EXCLUDED_RULE_INDICES = {
 COLLAPSED_RULE_INDICES = {
     # Import declarations
     Java20Parser.RULE_singleTypeImportDeclaration,
-    Java20Parser.RULE_singleTypeImportDeclaration,
     Java20Parser.RULE_typeImportOnDemandDeclaration,
     Java20Parser.RULE_singleStaticImportDeclaration,
     Java20Parser.RULE_staticImportOnDemandDeclaration,

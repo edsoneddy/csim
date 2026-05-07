@@ -71,5 +71,7 @@ def ANTLR_parse(file_name, file_content, lang):
         parser.removeErrorListeners()
         parser.addErrorListener(error_listener)
         tree = parser.translationUnit()
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
 
     return tree

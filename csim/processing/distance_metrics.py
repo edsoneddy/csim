@@ -44,6 +44,10 @@ def TreeEditDistance(N1, N2, ted_algorithm="zss"):
         d = apted.compute_edit_distance()
     else:
         d = 0
+        raise ValueError(
+            f"Unsupported ted_algorithm: {ted_algorithm}. "
+            "Supported algorithms are 'zss' and 'apted'."
+        )
     return d
 
 

@@ -172,7 +172,7 @@ def Normalize(tree, lang):
         lang: The programming language of the source code.
 
     Returns:
-        tuple: A ZSS Node representing the normalized tree.
+        dict: A normalized tree represented as a dictionary with 'label' and 'children' keys.
     """
     excluded_token_types = get_excluded_token_types(lang)
 

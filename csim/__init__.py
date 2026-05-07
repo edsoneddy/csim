@@ -1,7 +1,5 @@
-from csim.CodeSimilarity import Compare
-from csim.CodeSimilarity import ANTLR_parse
-from csim.CodeSimilarity import Normalize
-from csim.CodeSimilarity import PruneAndHash
-from csim.CodeSimilarity import SimilarityIndex
-from csim.utils import group_by_similarity
-from csim.utils import compare_all
+from .CodeSimilarity import Compare
+from .language.parser import ANTLR_parse
+from .processing.tree_processing import Normalize, PruneAndHash
+from .processing.distance_metrics import SimilarityIndex
+from .utils import group_by_similarity, compare_all

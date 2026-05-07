@@ -11,7 +11,7 @@ The Parse Trees are generated using **ANTLR4** and compared using
 **Tree Edit Distance (ZSS or APTED)**
 
 ### Version Baseline
-- **Python:** 3.9–3.12 (recommended 3.11)
+- **Python:** 3.10–3.12 (recommended 3.11)
 - **ANTLR4 Python Runtime:** 4.13.2
 - **zss:** 1.2.0
 - **apted:** 1.0.3

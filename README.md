@@ -79,21 +79,21 @@ Notes:
 - The output uses full file paths when reporting similarities.
 
 ### Option --lang (Specify Language)
-csim can be used from the command line, supports Python, Java and Cpp source code files. You can specify the language using the `-lang` option. By default `python` is assumed.
+csim can be used from the command line, supports Python, Java and Cpp source code files. You can specify the language using the `--lang` option. By default `python` is assumed.
 
 For Python files, use:
 ```sh
-csim -f file1.py file2.py -lang python
+csim --files file1.py file2.py --lang python
 ```
 
 For Java files, use:
 ```sh
-csim -f file1.java file2.java -lang java
+csim --files file1.java file2.java --lang java
 ```
 
 For Cpp files, use:
 ```sh
-csim -f file1.cpp file2.cpp -lang cpp
+csim --files file1.cpp file2.cpp --lang cpp
 ```
 
 ### Option --threshold (Specify Similarity Threshold)

@@ -18,14 +18,6 @@ def print_tree(node, indent=0):
         print_tree(child, indent + 1)
 
 
-def print_tree(node, indent=0):
-    if node is None:
-        return
-    print("   " * indent + str(node.label))
-    for child in node.children:
-        print_tree(child, indent + 1)
-
-
 def get_file(file_path):
     if not Path(file_path).is_file():
         raise argparse.ArgumentTypeError(f"File '{file_path}' does not exist.")
@@ -41,8 +33,17 @@ def read_file(file_path):
         print(f"Error reading file {file_path}: {e}")
         return file_path, None
 
+def get_extension_by_lang(lang):
+    if lang == "python":
+        return ".py"
+    elif lang == "java":
+        return ".java"
+    elif lang == "cpp":
+        return ".cpp"
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
 
-def process_files(path, files):
+def process_files(path, files, lang):
     # Storage for file names and contents
     file_names = []
     file_contents = []
@@ -56,7 +57,7 @@ def process_files(path, files):
         # Process the files in the directory
         for file in os.listdir(path):
             file_path = os.path.join(path, file)
-            if os.path.isfile(file_path) and file.endswith(".py"):
+            if os.path.isfile(file_path) and file.endswith(get_extension_by_lang(lang)):
                 file_name, content = read_file(file_path)
                 # Store the file name and content
                 file_names.append(file_name)
@@ -123,7 +124,7 @@ def get_exclude_childrens_from_rule(lang):
         lang (str): Programming language identifier.
 
     Returns:
-        set: Set of rule indices whose children should be excluded from similarity comparison.
+        dict: Dictionary mapping rule indices to lists of child indices to exclude.
     """
     if lang == "python":
         from .python.utils import (

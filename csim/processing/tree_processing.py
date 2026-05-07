@@ -71,9 +71,8 @@ def get_parser_visitor_class(lang):
             if not children_nodes:
                 return {"label": rule_index, "children": []}
 
-            """Node compression: if a node has only one child.
-            Can return the child directly to reduce unnecessary levels in the tree.
-            """
+            # Node compression: if a node has only one child.
+            # Can return the child directly to reduce unnecessary levels in the tree.
             if len(children_nodes) == 1:
                 # Single child: return it directly to avoid unnecessary nesting
                 return children_nodes[0]

@@ -31,6 +31,7 @@ def main():
         "--files",
         "-f",
         nargs=2,
+        type=get_file,
         metavar=("FILE1", "FILE2"),
         help="Two specific source code files to compare. Cannot be used with --path.",
     )

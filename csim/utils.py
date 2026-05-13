@@ -1,7 +1,9 @@
 import argparse
 from pathlib import Path
 import os
+from csim.language.lexer import ANTLR_tokenize
 from .DataStructures import UFDS as UnionFind
+from datasketch import MinHash, MinHashLSH
 
 
 def get_file(file_path):
@@ -33,6 +35,7 @@ def read_file(file_path):
         print(f"Error reading file {file_path}: {e}")
         return file_path, None
 
+
 def get_extension_by_lang(lang):
     if lang == "python":
         return ".py"
@@ -42,6 +45,7 @@ def get_extension_by_lang(lang):
         return ".cpp"
     else:
         raise ValueError(f"Unsupported language: {lang}")
+
 
 def process_files(path, files, lang):
     # Storage for file names and contents
@@ -178,7 +182,7 @@ def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):
     return result
 
 
-def compare_all(file_names, file_contents, lang, ted_algorithm):
+def report_pairwise_similarity(file_names, file_contents, lang, ted_algorithm):
 
     file_number = len(file_names)
     proccesed_files = [
@@ -248,7 +252,9 @@ def get_output_by_group(file_names, groups, similarity_indices, threshold):
     return "\n".join(result)
 
 
-def group_by_similarity(file_names, file_contents, lang, threshold, ted_algorithm):
+def group_by_exhaustive_search(
+    file_names, file_contents, lang, threshold, ted_algorithm
+):
 
     file_number = len(file_names)
     grouper = UnionFind(file_number)
@@ -280,6 +286,56 @@ def group_by_similarity(file_names, file_contents, lang, threshold, ted_algorith
         if root not in groups:
             groups[root] = []
         groups[root].append(i)
+
+    groups = list(groups.values())
+
+    return get_output_by_group(file_names, groups, similarity_indices, threshold)
+
+
+def group_by_lsh_search(file_names, file_contents, lang, threshold, ted_algorithm):
+    num_files = len(file_names)
+    num_perm = 128
+    JACCARD_THRESHOLD = 0.3  # Threshold for LSH candidate selection
+
+    tokenized_files = [
+        ANTLR_tokenize(file_names[idx], file_contents[idx], lang)
+        for idx in range(num_files)
+    ]
+
+    proccesed_files = [
+        preprocess_code(file_names[idx], file_contents[idx], lang)
+        for idx in range(num_files)
+    ]
+
+    similarity_indices = [0.00] * num_files
+
+    lsh = MinHashLSH(threshold=JACCARD_THRESHOLD, num_perm=num_perm)
+    minhashes = []
+
+    for idx, tokens in enumerate(tokenized_files):
+        m = MinHash(num_perm=num_perm)
+        for token_id in tokens:
+            m.update(str(token_id).encode("utf8"))
+        lsh.insert(idx, m)
+        minhashes.append(m)
+
+    uf = UnionFind(num_files)
+    for idx in range(num_files):
+        candidates = lsh.query(minhashes[idx])
+        for cand_idx in candidates:
+            similarity_index = get_similarity_coefficient(
+                proccesed_files[idx], proccesed_files[cand_idx], ted_algorithm
+            )
+            if similarity_index > threshold:
+                similarity_indices[idx] = similarity_index
+                uf.union(idx, cand_idx)
+
+    groups = {}
+    for idx in range(num_files):
+        root = uf.find(idx)
+        if root not in groups:
+            groups[root] = []
+        groups[root].append(idx)
 
     groups = list(groups.values())
 

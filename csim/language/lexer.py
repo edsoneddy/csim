@@ -26,7 +26,7 @@ def ANTLR_tokenize(file_name, file_content, lang):
         file_content: Source code as a string to be tokenized.
         lang: programming language of the source code (e.g. python, java, etc.).
     Returns:
-        result 
+        List of token types extracted from the source code. 
     """
     input_stream = InputStream(file_content)
     error_listener = ExtendedErrorListener(file_name)

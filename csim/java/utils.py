@@ -2,18 +2,6 @@ from .Java20Lexer import Java20Lexer
 from .Java20Parser import Java20Parser
 from antlr4 import Token
 
-EXCLUDED_RULE_INDICES = {
-    # Modifiers and type identifiers
-    Java20Parser.RULE_classModifier,
-    Java20Parser.RULE_typeIdentifier,
-    Java20Parser.RULE_fieldModifier,
-    Java20Parser.RULE_unannPrimitiveType,
-    Java20Parser.RULE_unannType,
-    Java20Parser.RULE_primitiveType,
-    Java20Parser.RULE_unannClassOrInterfaceType,
-    Java20Parser.RULE_methodModifier,
-}
-
 COLLAPSED_RULE_INDICES = {
     # Import declarations
     Java20Parser.RULE_singleTypeImportDeclaration,

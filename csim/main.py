@@ -102,7 +102,7 @@ def main():
 
     # Process files
     try:
-        file_names, file_contents = process_files(args.path, None, args.lang)
+        file_names, file_contents = process_files(args.path, args.lang)
 
         if len(file_names) < 2:
             print("Error: At least two files are required for comparison.")

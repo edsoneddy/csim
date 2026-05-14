@@ -47,7 +47,7 @@ def get_extension_by_lang(lang):
         raise ValueError(f"Unsupported language: {lang}")
 
 
-def process_files(path, files, lang):
+def process_files(path, lang):
     # Storage for file names and contents
     file_names = []
     file_contents = []
@@ -66,13 +66,6 @@ def process_files(path, files, lang):
                 # Store the file name and content
                 file_names.append(file_name)
                 file_contents.append(content)
-    elif files:
-        file1, file2 = files
-        file_name1, content1 = read_file(file1)
-        file_name2, content2 = read_file(file2)
-        # Store the file name and content
-        file_names.extend([file_name1, file_name2])
-        file_contents.extend([content1, content2])
 
     return file_names, file_contents
 
@@ -323,11 +316,13 @@ def group_by_lsh_search(file_names, file_contents, lang, threshold, ted_algorith
     for idx in range(num_files):
         candidates = lsh.query(minhashes[idx])
         for cand_idx in candidates:
+            if cand_idx == idx:
+                continue
             similarity_index = get_similarity_coefficient(
                 proccesed_files[idx], proccesed_files[cand_idx], ted_algorithm
             )
             if similarity_index > threshold:
-                similarity_indices[idx] = similarity_index
+                similarity_indices[cand_idx] = similarity_index
                 uf.union(idx, cand_idx)
 
     groups = {}

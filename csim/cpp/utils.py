@@ -2,9 +2,7 @@ from .CPP14Lexer import CPP14Lexer
 from .CPP14Parser import CPP14Parser
 from antlr4 import Token
 
-EXCLUDED_RULE_INDICES = {}
-
-COLLAPSED_RULE_INDICES = {}
+COLLAPSED_RULE_INDICES = set()
 
 EXCLUDED_TOKEN_TYPES = {
     # Punctuation that does not contribute to structural similarity

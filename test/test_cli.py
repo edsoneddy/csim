@@ -41,23 +41,7 @@ def test_cli_group_action_exhaustive():
     print(f"\nOutput of group action (exhaustive):\n{result.stdout}")
 
 
-def test_cli_group_action_lsh():
-    """
-    Testing the execution of the CLI with the 'group' action using LSH strategy.
-    This groups files using Locality Sensitive Hashing for faster performance.
-    """
-    test_dir = "test/files/"
 
-    command = [CSIM_EXECUTABLE, "group", "-p", test_dir, "-t", "0.8", "-l", "python", "-s", "lsh"]
-
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
-
-    assert result.returncode == 0, f"CLI failed with return code {result.returncode}. Error: {result.stderr}"
-
-    assert result.stdout, "The output of the group command is empty."
-    assert "Threshold" in result.stdout, f"The output does not contain the expected text. Output: {result.stdout}"
-    assert "Total files processed" in result.stdout, f"The output does not contain the expected text. Output: {result.stdout}"
-    print(f"\nOutput of group action (lsh):\n{result.stdout}")
 
 
 def test_cli_group_action_default_strategy():

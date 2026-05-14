@@ -9,7 +9,6 @@ Code Similarity (csim) provide a module designed to detect similarities between 
 - **File Grouping:** Cluster similar files into groups based on a configurable threshold.
 - **Flexible Search Strategies:** 
   - **Exhaustive Search:** All-pairs comparison for maximum precision
-  - **LSH Optimization:** Fast candidate selection using Locality Sensitive Hashing for large codebases
 - **Advanced Analysis:** Utilizes parse trees and the tree edit distance algorithm for in-depth analysis.
 - **Parse Trees:** Represents the syntactic structure of source code, enabling detailed comparisons.
 - **Tree Edit Distance:** Measures the similarity between different code structures.
@@ -22,7 +21,6 @@ Code Similarity (csim) provide a module designed to detect similarities between 
 - **ANTLR:** A parser generator for creating parse trees from source code.
 - **zss:** A library for calculating the tree edit distance.
 - **apted:** A library for computing the tree edit distance, alternatively to zss.
-- **datasketch:** Provides implementations of probabilistic data structures like MinHash for fast similarity estimation.
 - **NumPy:** Used for efficient numerical operations.
 
 ## Installation
@@ -53,7 +51,6 @@ pip install csim
 - **ANTLR4 Python Runtime:** 4.13.2
 - **zss:** 1.2.0
 - **apted:** 1.0.3
-- **datasketch:** 1.10.0
 - **numpy:** 1.26.4
 
 ## Quick Start
@@ -124,27 +121,19 @@ Compares every file against every other file (O(n²)). This is the most thorough
 csim group --path /path/to/directory --threshold 0.8 --strategy exhaustive
 ```
 
-##### 2. **lsh** (Optimized)
-Uses Locality Sensitive Hashing (LSH) to quickly identify candidate pairs before detailed structural comparison. This is significantly faster for large codebases while maintaining high accuracy.
-
-```sh
-csim group --path /path/to/directory --threshold 0.8 --strategy lsh
-```
-
 **When to use each:**
 - **exhaustive**: Small datasets (< 100 files), when maximum precision is critical
-- **lsh**: Large datasets (> 100 files), when speed is important
 
 #### Group Action Options
 
 - `--threshold, -t`: Similarity threshold (0.0 to 1.0). **Required.**
-- `--strategy, -s`: Grouping strategy (default: `exhaustive`). Options: `exhaustive`, `lsh`
+- `--strategy, -s`: Grouping strategy (default: `exhaustive`). Options: `exhaustive`
 - `--lang, -l`: Programming language (default: `python`). Options: `python`, `java`, `cpp`
 - `--talg, -ta`: Tree edit distance algorithm (default: `zss`). Options: `zss`, `apted`
 
 **Complete example:**
 ```sh
-csim group --path /path/to/directory --threshold 0.9 --strategy lsh --lang python --talg apted
+csim group --path /path/to/directory --threshold 0.9 --strategy exhaustive --lang python --talg apted
 ```
 
 ### Language Support
@@ -252,7 +241,6 @@ For more information on the techniques and tools used in this project, refer to 
 - [zss (PyPI)](https://pypi.org/project/zss/)
 - [Hashing (Python Docs)](https://docs.python.org/3/library/hashlib.html)
 - [apted (GitHub)](https://github.com/JoaoFelipe/apted)
-- [datasketch (PyPI)](https://pypi.org/project/datasketch/)
 
 ## Third-Party Licenses
 
@@ -279,7 +267,3 @@ This project utilizes the following third-party libraries:
 - **License:** MIT License
 - **Repository:** [https://github.com/JoaoFelipe/apted](https://github.com/JoaoFelipe/apted)
 
-### datasketch
-- **Purpose:** Provides probabilistic data structures including MinHash for fast similarity estimation
-- **License:** MIT License
-- **Repository:** [https://github.com/ekzhu/datasketch](https://github.com/ekzhu/datasketch)

@@ -67,12 +67,6 @@ For small datasets (< 100 files), the default exhaustive search is fine and guar
 csim group --path ./small_dataset --threshold 0.8
 ```
 
-For large datasets (> 100 files), use the LSH strategy for faster processing:
-
-```bash
-csim group --path ./large_dataset --threshold 0.8 --strategy lsh
-```
-
 **Expected improvement:** 100-1000x faster on large datasets with > 99% accuracy.
 
 ---
@@ -112,15 +106,6 @@ Find copy-pasted functions or redundant code in a codebase:
 ```bash
 # Threshold 0.80 = significantly similar (possible refactoring opportunity)
 csim group --path ./src --threshold 0.80 --lang java
-```
-
-### Use Case 4: Large-Scale Analysis
-
-Processing 500+ submissions for a competitive programming platform:
-
-```bash
-# Use LSH for speed; lower threshold to catch variants
-csim group --path ./contest_submissions --threshold 0.75 --strategy lsh --lang cpp
 ```
 
 ---
@@ -179,7 +164,7 @@ csim group --path ./files --threshold 0.8 --talg apted
 # Large Java assignment dataset with LSH
 csim group --path ./java_submissions \
   --threshold 0.8 \
-  --strategy lsh \
+  --strategy exhaustive \
   --lang java \
   --talg apted
 ```
@@ -191,7 +176,7 @@ csim group --path ./java_submissions \
 For programmatic access, import csim functions directly:
 
 ```python
-from csim.utils import group_by_lsh_search, report_pairwise_similarity
+from csim.utils import report_pairwise_similarity
 
 # Your file data
 file_names = ["file1.py", "file2.py", "file3.py"]
@@ -245,9 +230,6 @@ python -m csim report --path ./files
 ```bash
 # If you ran this and it's slow:
 csim group --path ./1000_files --threshold 0.8 --strategy exhaustive
-
-# Try this instead:
-csim group --path ./1000_files --threshold 0.8 --strategy lsh
 ```
 
 ---

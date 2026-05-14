@@ -1,7 +1,6 @@
 import argparse
 from .utils import (
     group_by_exhaustive_search,
-    group_by_lsh_search,
     process_files,
     report_pairwise_similarity,
 )
@@ -23,7 +22,7 @@ def main():
     Arguments for 'group' action:
         --path, -p (str): Path to a directory containing source code files (required).
         --threshold, -t (float): Similarity threshold between 0.0 and 1.0 (required).
-        --strategy, -s (str): Grouping strategy: 'exhaustive' (default) or 'lsh'.
+        --strategy, -s (str): Grouping strategy: 'exhaustive' (default).
         --lang, -l (str): The programming language of the source files (default: 'python').
         --talg, -ta (str): The tree edit distance algorithm to use (default: 'zss').
     
@@ -64,7 +63,7 @@ def main():
         "--talg",
         "-ta",
         choices=["zss", "apted"],
-        default="zss",
+        default="apted",
         help="The tree edit distance algorithm to use (default: zss).",
     )
 
@@ -81,9 +80,9 @@ def main():
     parser.add_argument(
         "--strategy",
         "-s",
-        choices=["exhaustive", "lsh"],
+        choices=["exhaustive"],
         default="exhaustive",
-        help="Grouping strategy: 'exhaustive' (all-pairs comparison) or 'lsh' (optimized search). Default: exhaustive.",
+        help="Grouping strategy: 'exhaustive' (all-pairs comparison). Default: exhaustive.",
     )
 
     args = parser.parse_args()
@@ -98,7 +97,7 @@ def main():
         if args.threshold is not None:
             parser.error("The --threshold argument is only valid for 'group' action.")
         if args.strategy != "exhaustive":
-            parser.error("The --strategy argument is only valid for 'group' action.")
+            parser.error("The --strategy argument is only valid for 'group' action and must be 'exhaustive'.")
 
     # Process files
     try:
@@ -114,14 +113,9 @@ def main():
                 file_names, file_contents, args.lang, args.talg
             )
         elif args.action == "group":
-            if args.strategy == "exhaustive":
-                results = group_by_exhaustive_search(
-                    file_names, file_contents, args.lang, args.threshold, args.talg
-                )
-            else:  # lsh
-                results = group_by_lsh_search(
-                    file_names, file_contents, args.lang, args.threshold, args.talg
-                )
+            results = group_by_exhaustive_search(
+                file_names, file_contents, args.lang, args.threshold, args.talg
+            )
 
         print(results)
     except Exception as e:

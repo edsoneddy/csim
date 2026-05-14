@@ -9,7 +9,6 @@ setup(
         "zss==1.2.0",
         "numpy==1.26.4",
         "apted==1.0.3",
-        "datasketch==1.10.0",
     ],
     author="Eddy Lecoña",
     author_email="crew0eddy@gmail.com",

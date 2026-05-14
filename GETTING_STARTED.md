@@ -256,7 +256,6 @@ csim group --path ./1000_files --threshold 0.8 --strategy lsh
 
 - **Read the full documentation:** See [README.md](README.md)
 - **Understand strategies:** Read [docs/STRATEGIES.md](docs/STRATEGIES.md) for detailed comparison
-- **Check the changelog:** See [CHANGELOG.md](CHANGELOG.md) for recent updates
 - **Report issues:** Visit [GitHub Issues](https://github.com/EdsonEddy/csim/issues)
 
 ---

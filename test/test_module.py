@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from csim import Compare
+from csim.utils import group_by_exhaustive_search, report_pairwise_similarity
 
 
 def test_identical_python_code():
@@ -61,3 +64,61 @@ def test_apted_algorithm():
         content_a=code_a, content_b=code_b, lang="python", ted_algorithm="apted"
     )
     assert similarity is not None
+
+
+def test_report_pairwise_similarity(tmp_path: Path):
+    """
+    Tests that the reusable report helper generates pairwise output for a language.
+    """
+    file_a = tmp_path / "sample_a.java"
+    file_b = tmp_path / "sample_b.java"
+
+    code = 'public class Main { public static void main(String[] args) { System.out.println("Hello"); } }'
+    file_a.write_text(code)
+    file_b.write_text(code)
+
+    result = report_pairwise_similarity(
+        [str(file_a), str(file_b)],
+        [file_a.read_text(), file_b.read_text()],
+        lang="java",
+        ted_algorithm="zss",
+    )
+
+    assert result
+    assert "similarity index" in result
+    assert str(file_a) in result
+    assert str(file_b) in result
+
+
+def test_group_by_exhaustive_search(tmp_path: Path):
+    """
+    Tests that exhaustive grouping builds a transitive cluster.
+    """
+    samples = {
+        "a.py": "def f(x):\n    if x:\n        return x\n    return 0\n",
+        "b.py": "def f(y):\n    if y:\n        return y\n    return 0\n",
+        "c.py": "def f(x):\n    while x:\n        return x\n    return 0\n",
+        "d.py": "def f(x):\n    for _ in range(1):\n        return x\n    return 0\n",
+    }
+
+    file_names = []
+    file_contents = []
+    for file_name, content in samples.items():
+        file_path = tmp_path / file_name
+        file_path.write_text(content)
+        file_names.append(str(file_path))
+        file_contents.append(content)
+
+    result = group_by_exhaustive_search(
+        file_names,
+        file_contents,
+        lang="python",
+        threshold=0.67,
+        ted_algorithm="zss",
+    )
+
+    assert "Group 1" in result
+    assert "a.py" in result
+    assert "b.py" in result
+    assert "c.py" in result
+    assert "d.py" in result

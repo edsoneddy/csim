@@ -240,7 +240,7 @@ def get_output_by_group(file_names, groups, similarity_indices, threshold):
 
 
 def group_by_exhaustive_search(
-    file_names, file_contents, lang, threshold, ted_algorithm
+    file_names, file_contents, lang, threshold, ted_algorithm, with_output=True
 ):
 
     file_number = len(file_names)
@@ -274,4 +274,7 @@ def group_by_exhaustive_search(
 
     groups = list(groups.values())
 
-    return get_output_by_group(file_names, groups, similarity_indices, threshold)
+    if with_output:
+        return get_output_by_group(file_names, groups, similarity_indices, threshold)
+    
+    return {"groups": groups, "similarity_indices": similarity_indices}

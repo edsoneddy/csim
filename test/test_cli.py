@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import os
+from pathlib import Path
 
 CSIM_EXECUTABLE = os.path.join(os.path.dirname(sys.executable), 'csim')
 
@@ -76,3 +77,41 @@ def test_cli_group_missing_threshold():
     assert result.returncode != 0, f"CLI should have failed without --threshold. Output: {result.stderr}"
     assert "--threshold" in result.stderr or "required" in result.stderr.lower(), f"Error message should mention --threshold requirement. Error: {result.stderr}"
     print(f"\nCorrectly rejected missing threshold:\n{result.stderr}")
+
+
+def test_cli_report_invalid_path():
+    """
+    Testing that the CLI fails when the provided path does not exist.
+    """
+    command = [CSIM_EXECUTABLE, "report", "-p", "test/does-not-exist", "-l", "python"]
+
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+
+    assert result.returncode != 0, "CLI should fail for an invalid path."
+    assert "not a valid directory" in result.stderr.lower()
+
+
+def test_cli_group_transitive_cluster(tmp_path: Path):
+    """
+    Testing that exhaustive grouping connects files transitively.
+    """
+    samples = {
+        "a.py": "def f(x):\n    if x:\n        return x\n    return 0\n",
+        "b.py": "def f(y):\n    if y:\n        return y\n    return 0\n",
+        "c.py": "def f(x):\n    while x:\n        return x\n    return 0\n",
+        "d.py": "def f(x):\n    for _ in range(1):\n        return x\n    return 0\n",
+    }
+
+    for file_name, content in samples.items():
+        (tmp_path / file_name).write_text(content)
+
+    command = [CSIM_EXECUTABLE, "group", "-p", str(tmp_path), "-t", "0.67", "-l", "python"]
+
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+
+    assert result.returncode == 0, f"CLI failed with return code {result.returncode}. Error: {result.stderr}"
+    assert "Group 1" in result.stdout
+    assert "a.py" in result.stdout
+    assert "b.py" in result.stdout
+    assert "c.py" in result.stdout
+    assert "d.py" in result.stdout

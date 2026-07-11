@@ -47,22 +47,17 @@ def get_extension_by_lang(lang):
 
 
 def process_files(path, lang):
-    # Storage for file names and contents
     file_names = []
     file_contents = []
 
-    # Process the files based on the provided arguments
     if path:
-        # Check if the path is a valid directory
         if not os.path.isdir(path):
-            print(f"Error: The path '{path}' is not a valid directory.")
-            return file_names, file_contents
-        # Process the files in the directory
+            raise NotADirectoryError(f"The path '{path}' is not a valid directory.")
+
         for file in os.listdir(path):
             file_path = os.path.join(path, file)
             if os.path.isfile(file_path) and file.endswith(get_extension_by_lang(lang)):
                 file_name, content = read_file(file_path)
-                # Store the file name and content
                 file_names.append(file_name)
                 file_contents.append(content)
 
@@ -259,17 +254,15 @@ def group_by_exhaustive_search(
     similarity_indices = [0.00] * file_number
 
     for i in range(file_number - 1):
-        if grouper.find(i) == i:
-            file_a = proccesed_files[i]
-            for j in range(i + 1, file_number):
-                if grouper.find(j) == j:
-                    file_b = proccesed_files[j]
-                    similarity_index = get_similarity_coefficient(
-                        file_a, file_b, ted_algorithm
-                    )
-                    if similarity_index > threshold:
-                        grouper.union(i, j)
-                        similarity_indices[j] = similarity_index
+        file_a = proccesed_files[i]
+        for j in range(i + 1, file_number):
+            file_b = proccesed_files[j]
+            similarity_index = get_similarity_coefficient(
+                file_a, file_b, ted_algorithm
+            )
+            if similarity_index > threshold:
+                grouper.union(i, j)
+                similarity_indices[j] = similarity_index
 
     groups = {}
 

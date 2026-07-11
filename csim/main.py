@@ -63,7 +63,7 @@ def main():
         "--talg",
         "-ta",
         choices=["zss", "apted"],
-        default="apted",
+        default="zss",
         help="The tree edit distance algorithm to use (default: zss).",
     )
 
@@ -99,27 +99,24 @@ def main():
         if args.strategy != "exhaustive":
             parser.error("The --strategy argument is only valid for 'group' action and must be 'exhaustive'.")
 
-    # Process files
     try:
         file_names, file_contents = process_files(args.path, args.lang)
+    except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
+        parser.error(str(exc))
 
-        if len(file_names) < 2:
-            print("Error: At least two files are required for comparison.")
-            return
+    if len(file_names) < 2:
+        parser.error("At least two files are required for comparison.")
 
-        # Execute the appropriate action
-        if args.action == "report":
-            results = report_pairwise_similarity(
-                file_names, file_contents, args.lang, args.talg
-            )
-        elif args.action == "group":
-            results = group_by_exhaustive_search(
-                file_names, file_contents, args.lang, args.threshold, args.talg
-            )
+    if args.action == "report":
+        results = report_pairwise_similarity(
+            file_names, file_contents, args.lang, args.talg
+        )
+    elif args.action == "group":
+        results = group_by_exhaustive_search(
+            file_names, file_contents, args.lang, args.threshold, args.talg
+        )
 
-        print(results)
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    print(results)
 
 
 if __name__ == "__main__":

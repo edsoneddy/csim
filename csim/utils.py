@@ -13,8 +13,8 @@ def get_file(file_path):
 def print_tree(node, indent=0):
     if node is None:
         return
-    print("   " * indent + str(node.label))
-    for child in node.children:
+    print("   " * indent + str(node["label"]))
+    for child in node["children"]:
         print_tree(child, indent + 1)
 
 
@@ -34,32 +34,31 @@ def read_file(file_path):
         return file_path, None
 
 
-def process_files(path, files):
-    # Storage for file names and contents
+def get_extension_by_lang(lang):
+    if lang == "python":
+        return ".py"
+    elif lang == "java":
+        return ".java"
+    elif lang == "cpp":
+        return ".cpp"
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
+
+
+def process_files(path, lang):
     file_names = []
     file_contents = []
 
-    # Process the files based on the provided arguments
     if path:
-        # Check if the path is a valid directory
         if not os.path.isdir(path):
-            print(f"Error: The path '{path}' is not a valid directory.")
-            return file_names, file_contents
-        # Process the files in the directory
+            raise NotADirectoryError(f"The path '{path}' is not a valid directory.")
+
         for file in os.listdir(path):
             file_path = os.path.join(path, file)
-            if os.path.isfile(file_path) and file.endswith(".py"):
+            if os.path.isfile(file_path) and file.endswith(get_extension_by_lang(lang)):
                 file_name, content = read_file(file_path)
-                # Store the file name and content
                 file_names.append(file_name)
                 file_contents.append(content)
-    elif files:
-        file1, file2 = files
-        file_name1, content1 = read_file(file1)
-        file_name2, content2 = read_file(file2)
-        # Store the file name and content
-        file_names.extend([file_name1, file_name2])
-        file_contents.extend([content1, content2])
 
     return file_names, file_contents
 
@@ -78,9 +77,17 @@ def get_excluded_token_types(lang):
         set: Set of excluded token types.
     """
     if lang == "python":
-        from .python.utils import EXCLUDED_TOKEN_TYPES as python_excluded_tokens
+        from .python.utils import EXCLUDED_TOKEN_TYPES as python_excluded
 
-        return python_excluded_tokens
+        return python_excluded
+    elif lang == "java":
+        from .java.utils import EXCLUDED_TOKEN_TYPES as java_excluded
+
+        return java_excluded
+    elif lang == "cpp":
+        from .cpp.utils import EXCLUDED_TOKEN_TYPES as cpp_excluded
+
+        return cpp_excluded
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -107,7 +114,7 @@ def get_exclude_childrens_from_rule(lang):
         lang (str): Programming language identifier.
 
     Returns:
-        set: Set of rule indices whose children should be excluded from similarity comparison.
+        dict: Dictionary mapping rule indices to lists of child indices to exclude.
     """
     if lang == "python":
         from .python.utils import (
@@ -116,7 +123,7 @@ def get_exclude_childrens_from_rule(lang):
 
         return python_exclude_childrens_from_rule
     else:
-        return set()  # Default to empty set for unsupported languages
+        return dict()  # Default to empty dict for unsupported languages
 
 
 def get_control_equivalence_rule_indices(lang):
@@ -161,7 +168,7 @@ def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):
     return result
 
 
-def compare_all(file_names, file_contents, lang, ted_algorithm):
+def report_pairwise_similarity(file_names, file_contents, lang, ted_algorithm):
 
     file_number = len(file_names)
     proccesed_files = [
@@ -176,8 +183,9 @@ def compare_all(file_names, file_contents, lang, ted_algorithm):
 
     # Fill the first row and first column with file names
     for i in range(file_number):
-        similarity_matrix[0][i + 1] = file_names[i].split("/")[-1].replace(".py", "")
-        similarity_matrix[i + 1][0] = file_names[i].split("/")[-1].replace(".py", "")
+        display_name = Path(file_names[i]).name
+        similarity_matrix[0][i + 1] = display_name
+        similarity_matrix[i + 1][0] = display_name
 
     results = []
     # Calculate similarity percentages and fill the matrix
@@ -190,7 +198,9 @@ def compare_all(file_names, file_contents, lang, ted_algorithm):
                 similarity_matrix[i + 1][j + 1] = 1.00
             else:
                 file_b = proccesed_files[j]
-                similarity_index = get_similarity_coefficient(file_a, file_b, ted_algorithm)
+                similarity_index = get_similarity_coefficient(
+                    file_a, file_b, ted_algorithm
+                )
                 similarity_matrix[i + 1][j + 1] = round(similarity_index, 2)
                 similarity_matrix[j + 1][i + 1] = round(similarity_index, 2)
                 results.append(
@@ -229,7 +239,9 @@ def get_output_by_group(file_names, groups, similarity_indices, threshold):
     return "\n".join(result)
 
 
-def group_by_similarity(file_names, file_contents, lang, threshold, ted_algorithm):
+def group_by_exhaustive_search(
+    file_names, file_contents, lang, threshold, ted_algorithm
+):
 
     file_number = len(file_names)
     grouper = UnionFind(file_number)
@@ -242,17 +254,15 @@ def group_by_similarity(file_names, file_contents, lang, threshold, ted_algorith
     similarity_indices = [0.00] * file_number
 
     for i in range(file_number - 1):
-        if grouper.find(i) == i:
-            file_a = proccesed_files[i]
-            for j in range(i + 1, file_number):
-                if grouper.find(j) == j:
-                    file_b = proccesed_files[j]
-                    similarity_index = get_similarity_coefficient(
-                        file_a, file_b, ted_algorithm
-                    )
-                    if similarity_index > threshold:
-                        grouper.union(i, j)
-                        similarity_indices[j] = similarity_index
+        file_a = proccesed_files[i]
+        for j in range(i + 1, file_number):
+            file_b = proccesed_files[j]
+            similarity_index = get_similarity_coefficient(
+                file_a, file_b, ted_algorithm
+            )
+            if similarity_index > threshold:
+                grouper.union(i, j)
+                similarity_indices[j] = similarity_index
 
     groups = {}
 

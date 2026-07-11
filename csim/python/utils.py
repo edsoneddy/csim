@@ -1,4 +1,4 @@
-from csim.utils import TOKEN_TYPE_OFFSET
+from ..utils import TOKEN_TYPE_OFFSET
 from .PythonParser import PythonParser
 from .PythonLexer import PythonLexer
 from antlr4 import Token

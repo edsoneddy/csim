@@ -5,10 +5,15 @@ Code Similarity (csim) provide a module designed to detect similarities between 
 ## Key Features
 
 - **Source Code Similarity Analysis:** Compares source code files to determine their degree of similarity.
+- **Pairwise Reporting:** Generate detailed similarity reports for all file pairs.
+- **File Grouping:** Cluster similar files into groups based on a configurable threshold.
+- **Flexible Search Strategies:** 
+  - **Exhaustive Search:** All-pairs comparison for maximum precision
 - **Advanced Analysis:** Utilizes parse trees and the tree edit distance algorithm for in-depth analysis.
 - **Parse Trees:** Represents the syntactic structure of source code, enabling detailed comparisons.
 - **Tree Edit Distance:** Measures the similarity between different code structures.
 - **Hash-Based Pruning:** Optimizes the comparison process by reducing tree size while preserving essential structure.
+- **Multi-Language Support:** Supports Python, Java, and C++ source code analysis.
 
 ## Technologies Used
 
@@ -16,6 +21,7 @@ Code Similarity (csim) provide a module designed to detect similarities between 
 - **ANTLR:** A parser generator for creating parse trees from source code.
 - **zss:** A library for calculating the tree edit distance.
 - **apted:** A library for computing the tree edit distance, alternatively to zss.
+- **NumPy:** Used for efficient numerical operations.
 
 ## Installation
 For the installation `pip` is required, you can either clone the repository and install it locally or install it directly from PyPI.
@@ -34,91 +40,171 @@ For the installation `pip` is required, you can either clone the repository and 
     ```
 
 Alternatively, you can install it directly from PyPI:
+
 ```sh
 pip install csim
 ```
 
+
 ### Version Compatibility
-- **Python:** 3.9–3.12 (recommended 3.11)
+- **Python:** 3.10–3.12 (recommended 3.11)
 - **ANTLR4 Python Runtime:** 4.13.2
 - **zss:** 1.2.0
 - **apted:** 1.0.3
+- **numpy:** 1.26.4
 
-## Usage
-csim can be used from the command line. For now, only Python files are supported; more languages will be added in future versions. 
+## Quick Start
 
-For example, to compare two Python files, run:
+**New to csim?** Start here: [GETTING_STARTED.md](GETTING_STARTED.md)
 
-### Option --files (Specify Files)
-This option will compare two specified files and output the similarity index.
-```sh
-csim --files file1.py file2.py
-```
-### Output
-```sh
-file1.py is similar to file2.py with similarity index: X.XX
-```
+For detailed information about search strategies, see: [docs/STRATEGIES.md](docs/STRATEGIES.md)
 
-### Option --path (Specify Directory)
-This option will compare all the files in the specified directory and output the similarity index for each pair of files. This option is expensive in terms of time complexity, so it is recommended to use it with a small number of files.
+csim supports two main actions: **report** (for pairwise similarity analysis) and **group** (for clustering similar files). The tool supports Python, Java, and C++ source code files.
+
+### General Command Structure
 ```sh
-csim --path /path/to/directory  
-```
-### Output
-```sh
-file1.py is similar to file2.py with similarity index: X.XX
-file1.py is similar to file3.py with similarity index: X.XX
-...
-fileN.py is similar to fileM.py with similarity index: X.XX
+csim <action> --path <directory> [options]
 ```
 
-Notes:
-- Only `.py` files within the directory are considered.
-- The output uses full file paths when reporting similarities.
+### Action 1: `report` - Generate Similarity Report
 
-### Option --lang (Specify Language)
-You can specify the input language. Currently, only `python` is supported and it is the default.
+Generates a pairwise similarity report comparing all files in a directory.
+
 ```sh
-csim --files file1.py file2.py --lang python
+csim report --path /path/to/directory
 ```
 
-### Option --threshold (Specify Similarity Threshold)
-You can specify a similarity threshold to group files based on their similarity.
-Only available when using the `--files` option. If the similarity index is above the threshold, it will be reported in the output.
-```sh
-csim --path /path/to/directory --threshold 0.7
+**Example Output:**
 ```
-### Output
-```sh
-Threshold: 0.7
-Total files processed: N
-Group 1 (Average similarity: X.XX):
-  file1.py
-  file2.py
-Group 2 (Average similarity: X.XX):
-  file3.py
-  file4.py
-...
-Unique files (similarity below threshold):
-  fileN.py
+file1.py is similar to file2.py with similarity index: 0.95
+file1.py is similar to file3.py with similarity index: 0.45
+file2.py is similar to file3.py with similarity index: 0.50
 ```
 
-### Option --talg (Specify Tree Edit Distance Algorithm)
-You can specify the tree edit distance algorithm to use for comparisons. The available options are `zss` (default) and `apted`.
+**Options:**
+- `--lang, -l`: Programming language (default: `python`). Options: `python`, `java`, `cpp`
+- `--talg, -ta`: Tree edit distance algorithm (default: `zss`). Options: `zss`, `apted`
+
+**Example with options:**
 ```sh
-csim --files file1.py file2.py --talg apted
+csim report --path /path/to/directory --lang java --talg apted
 ```
 
-### Alternatively, you can use csim as a Python module:
+### Action 2: `group` - Group Files by Similarity
+
+Groups files by similarity using a specified threshold and strategy.
+
+```sh
+csim group --path /path/to/directory --threshold 0.8
+```
+
+**Example Output:**
+```
+Threshold: 0.8
+Total files processed: 4
+Group 1 (Average Similarity: 0.98):
+./file1.py
+./file2.py
+Group 2 (Average Similarity: 0.95):
+./file3.py
+./file4.py
+```
+
+#### Strategy Options
+
+The `group` action supports two strategies for finding similar files:
+
+##### 1. **exhaustive** (Default)
+Compares every file against every other file (O(n²)). This is the most thorough approach but slower for large datasets.
+
+```sh
+csim group --path /path/to/directory --threshold 0.8 --strategy exhaustive
+```
+
+**When to use each:**
+- **exhaustive**: Small datasets (< 100 files), when maximum precision is critical
+
+#### Group Action Options
+
+- `--threshold, -t`: Similarity threshold (0.0 to 1.0). **Required.**
+- `--strategy, -s`: Grouping strategy (default: `exhaustive`). Options: `exhaustive`
+- `--lang, -l`: Programming language (default: `python`). Options: `python`, `java`, `cpp`
+- `--talg, -ta`: Tree edit distance algorithm (default: `zss`). Options: `zss`, `apted`
+
+**Complete example:**
+```sh
+csim group --path /path/to/directory --threshold 0.9 --strategy exhaustive --lang python --talg apted
+```
+
+### Language Support
+
+The tool supports the following programming languages:
+
+**Python:**
+```sh
+csim report --path /path/to/python/files --lang python
+```
+
+**Java:**
+```sh
+csim report --path /path/to/java/files --lang java
+```
+
+**C++:**
+```sh
+csim report --path /path/to/cpp/files --lang cpp
+```
+
+### Threshold Guidance
+
+The similarity threshold represents the structural similarity of the code (based on the Abstract Syntax Tree). Choose appropriate thresholds based on your use case:
+
+- **0.95+**: Nearly identical code (likely plagiarism)
+- **0.85-0.95**: Very similar code (probable plagiarism)
+- **0.70-0.85**: Moderately similar code (review recommended)
+- **<0.70**: Low similarity (likely independent work)
+
+### Using csim as a Python Module
+
+You can also use csim programmatically within your Python code. The library provides low-level functions for advanced use cases:
+
+```python
+from csim.utils import group_by_exhaustive_search, report_pairwise_similarity
+
+# Example: Group files by similarity
+file_names = ["file1.py", "file2.py", "file3.py"]
+file_contents = [code1, code2, code3]
+
+results = group_by_exhaustive_search(
+    file_names=file_names,
+    file_contents=file_contents,
+    lang="python",
+    threshold=0.8,
+    ted_algorithm="zss"
+)
+
+print(results)
+```
+
+Or use the legacy Compare class for simple pairwise comparisons:
+
 ```python
 from csim import Compare
+
 code_a = "a = 5"
 code_b = "c = 50"
-similarity = Compare(name_a = 'example A', content_a = code_a, name_b = 'example B', content_b = code_b)
+similarity = Compare(name_a='example A', content_a=code_a, name_b='example B', content_b=code_b)
 print(f"Similarity: {similarity}") # Output: Similarity: X.XX
 ```
 
+## Documentation
+
+- [Getting Started Guide](GETTING_STARTED.md) - Quick tutorial for new users
+- [Search Strategies Guide](docs/STRATEGIES.md) - Detailed explanation of available search strategies
+- [ANTLR Parser Generation](grammars/parser_gen_guide.md) - For grammar customization
+
 ## ANTLR4 Installation and Parser/Lexer Generation
+
 This installation is not required—the generated files are already included in the project. If you'd like to review the steps to generate them yourself, see [grammars/parser_gen_guide.md](grammars/parser_gen_guide.md).
 
 Note: The included generated files were produced by **ANTLR 4.13.2** and are compatible with the pinned runtime listed above.
@@ -137,21 +223,23 @@ Contributions are welcome! To contribute, please follow these steps:
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## Links
+## Support
 
-- [Repository](https://github.com/EdsonEddy/csim)
-- [Documentation](https://github.com/EdsonEddy/csim/wiki)
-- [Report a Bug](https://github.com/EdsonEddy/csim/issues)
+- **Questions?** Open a [GitHub Discussion](https://github.com/EdsonEddy/csim/discussions)
+- **Found a bug?** File a [GitHub Issue](https://github.com/EdsonEddy/csim/issues)
+- **Want to contribute?** See [Contributing](#contributing) section
 
-## Additional Resources
+## References
 
 For more information on the techniques and tools used in this project, refer to the following resources:
 
 - [ANTLR](https://www.antlr.org/)
 - [Parse Tree (Wikipedia)](https://en.wikipedia.org/wiki/Parse_tree)
 - [Tree Edit Distance (Wikipedia)](https://en.wikipedia.org/wiki/Tree_edit_distance)
+- [Locality Sensitive Hashing (Wikipedia)](https://en.wikipedia.org/wiki/Locality-sensitive_hashing)
+- [MinHash (Wikipedia)](https://en.wikipedia.org/wiki/MinHash)
 - [zss (PyPI)](https://pypi.org/project/zss/)
-- [Hashing](https://docs.python.org/es/3/library/hashlib.html)
+- [Hashing (Python Docs)](https://docs.python.org/3/library/hashlib.html)
 - [apted (GitHub)](https://github.com/JoaoFelipe/apted)
 
 ## Third-Party Licenses
@@ -178,3 +266,4 @@ This project utilizes the following third-party libraries:
 - **Purpose:** Python APTED algorithm for the Tree Edit Distance, an alternative to zss
 - **License:** MIT License
 - **Repository:** [https://github.com/JoaoFelipe/apted](https://github.com/JoaoFelipe/apted)
+

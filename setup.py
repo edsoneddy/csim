@@ -2,13 +2,13 @@ from setuptools import setup, find_packages
 
 setup(
     name="csim",
-    version="1.7.0",
+    version="2.0.0",
     packages=find_packages(),
     install_requires=[
         "antlr4-python3-runtime==4.13.2",
         "zss==1.2.0",
         "numpy==1.26.4",
-        "apted==1.0.3"
+        "apted==1.0.3",
     ],
     author="Eddy Lecoña",
     author_email="crew0eddy@gmail.com",
@@ -28,7 +28,7 @@ setup(
         "Documentation": "https://github.com/EdsonEddy/csim/wiki",
         "Source Code": "https://github.com/EdsonEddy/csim",
     },
-    python_requires='>=3.9',
+    python_requires='>=3.10',
     platforms=["All"],
     entry_points={
         'console_scripts': [

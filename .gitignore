@@ -23,7 +23,4 @@ __pycache__/
 # Python egg and build files
 *.egg-info
 
-# Testing grammar files
-test
-
 notebooks/datasets

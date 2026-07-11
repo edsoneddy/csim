@@ -1,91 +1,122 @@
 import argparse
-from .utils import group_by_similarity, process_files, compare_all, get_file
+from .utils import (
+    group_by_exhaustive_search,
+    process_files,
+    report_pairwise_similarity,
+)
 
 
 def main():
     """
     Main function to parse command-line arguments and execute the similarity checker.
-    Arguments:
-        --files, -f (str, nargs=2): The input two files to compare.
-        --path, -p (str): Path to the directory containing the source code files.
-        --lang, -l (str): The programming language of the source files. Defaults to 'python'.
-        --threshold, -t (float): Similarity threshold between 0.0 and 1.0. Only valid when used with --path/-p option.
-        --talg, -ta (string): The tree edit distance algorithm to use. Defaults to 'zss'.
-        --help, -h: Show this help message and exit.
+    
+    Actions:
+        report: Generate a pairwise similarity report for all files.
+        group: Group files by similarity using a specified strategy.
+    
+    Arguments for 'report' action:
+        --path, -p (str): Path to a directory containing source code files (required).
+        --lang, -l (str): The programming language of the source files (default: 'python').
+        --talg, -ta (str): The tree edit distance algorithm to use (default: 'zss').
+    
+    Arguments for 'group' action:
+        --path, -p (str): Path to a directory containing source code files (required).
+        --threshold, -t (float): Similarity threshold between 0.0 and 1.0 (required).
+        --strategy, -s (str): Grouping strategy: 'exhaustive' (default).
+        --lang, -l (str): The programming language of the source files (default: 'python').
+        --talg, -ta (str): The tree edit distance algorithm to use (default: 'zss').
+    
     Returns:
         None
     """
-    # Create the argument parser
     parser = argparse.ArgumentParser(
-        description="Compare two source code files for similarity."
+        description="A command-line tool to detect code similarity and plagiarism."
     )
 
-    # Create a mutually exclusive group
-    group = parser.add_mutually_exclusive_group(required=True)
+    # Action argument (positional)
+    parser.add_argument(
+        "action",
+        choices=["report", "group"],
+        help="Action to perform: 'report' for pairwise similarity report, 'group' for grouping files by similarity.",
+    )
 
-    # Add the 'path' argument to the group
-    group.add_argument(
+    # Required path argument
+    parser.add_argument(
         "--path",
         "-p",
         type=str,
-        help="Path to the directory containing the source code files to compare.",
+        required=True,
+        help="Path to a directory containing source code files.",
     )
 
-    # Add the 'files' argument to the group
-    group.add_argument(
-        "--files", "-f", type=get_file, nargs=2, help="The input two files to compare"
-    )
-
-    # Add the 'lang' argument to the group
+    # Language of the source files
     parser.add_argument(
         "--lang",
         "-l",
-        choices=["python"],
+        choices=["python", "java", "cpp"],
         default="python",
-        help="The programming language of the source files. Defaults to 'python'.",
+        help="The programming language of the source files (default: python).",
     )
 
-    # Optional threshold used only when --path is selected
-    parser.add_argument(
-        "--threshold",
-        "-t",
-        type=float,
-        help="Similarity threshold between 0.0 and 1.0. Only valid when used with --path/-p option.",
-    )
-
-    # Optional argument for tree edit distance algorithm
+    # Algorithm for tree edit distance
     parser.add_argument(
         "--talg",
         "-ta",
         choices=["zss", "apted"],
         default="zss",
-        help="The tree edit distance algorithm to use. Defaults to 'zss'.",
+        help="The tree edit distance algorithm to use (default: zss).",
     )
 
-    # Parse the arguments
+    # Threshold (only for 'group' action)
+    parser.add_argument(
+        "--threshold",
+        "-t",
+        type=float,
+        default=None,
+        help="Similarity threshold (0.0 to 1.0) for grouping files. Required for 'group' action.",
+    )
+
+    # Strategy (only for 'group' action)
+    parser.add_argument(
+        "--strategy",
+        "-s",
+        choices=["exhaustive"],
+        default="exhaustive",
+        help="Grouping strategy: 'exhaustive' (all-pairs comparison). Default: exhaustive.",
+    )
+
     args = parser.parse_args()
 
-    # Validate conditional use of --threshold: only allowed with --path
-    if args.threshold is not None:
-        if not args.path:
-            parser.error("argument --threshold: can only be used with --path/-p")
+    # Validate arguments based on action
+    if args.action == "group":
+        if args.threshold is None:
+            parser.error("The --threshold argument is required for 'group' action.")
         if not (0.0 <= args.threshold <= 1.0):
-            parser.error("argument --threshold: must be between 0.0 and 1.0")
-
-    # Process the files
-    file_names, file_contents = process_files(args.path, args.files)
+            parser.error("The --threshold must be a float between 0.0 and 1.0.")
+    elif args.action == "report":
+        if args.threshold is not None:
+            parser.error("The --threshold argument is only valid for 'group' action.")
+        if args.strategy != "exhaustive":
+            parser.error("The --strategy argument is only valid for 'group' action and must be 'exhaustive'.")
 
     try:
-        if len(file_names) >= 2:
-            if args.threshold is not None:
-                results = group_by_similarity(file_names, file_contents, args.lang, args.threshold, args.talg)
-            else:
-                results = compare_all(file_names, file_contents, args.lang, args.talg)
-        else:
-            results = "Please provide at least two files for comparison."
-        print(results)
-    except Exception as e:
-        print(f"An error occurred during comparison: {e}")
+        file_names, file_contents = process_files(args.path, args.lang)
+    except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
+        parser.error(str(exc))
+
+    if len(file_names) < 2:
+        parser.error("At least two files are required for comparison.")
+
+    if args.action == "report":
+        results = report_pairwise_similarity(
+            file_names, file_contents, args.lang, args.talg
+        )
+    elif args.action == "group":
+        results = group_by_exhaustive_search(
+            file_names, file_contents, args.lang, args.threshold, args.talg
+        )
+
+    print(results)
 
 
 if __name__ == "__main__":

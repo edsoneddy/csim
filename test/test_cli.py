@@ -2,8 +2,9 @@ import subprocess
 import sys
 import os
 from pathlib import Path
+import shutil
 
-CSIM_EXECUTABLE = os.path.join(os.path.dirname(sys.executable), 'csim')
+CSIM_EXECUTABLE = shutil.which("csim") or os.path.join(os.path.dirname(sys.executable), "csim")
 
 def test_cli_report_action():
     """

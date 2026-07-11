@@ -67,7 +67,7 @@ For small datasets (< 100 files), the default exhaustive search is fine and guar
 csim group --path ./small_dataset --threshold 0.8
 ```
 
-**Expected improvement:** 100-1000x faster on large datasets with > 99% accuracy.
+**Note:** Exhaustive search is O(n²) and may be slow on large datasets.
 
 ---
 
@@ -161,7 +161,7 @@ csim group --path ./files --threshold 0.8 --talg apted
 ### Combine Options
 
 ```bash
-# Large Java assignment dataset with LSH
+# Large Java assignment dataset (exhaustive search with apted algorithm)
 csim group --path ./java_submissions \
   --threshold 0.8 \
   --strategy exhaustive \

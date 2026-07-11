@@ -1,7 +1,6 @@
 import argparse
 from pathlib import Path
 import os
-from csim.language.lexer import ANTLR_tokenize
 from .DataStructures import UFDS as UnionFind
 
 
@@ -184,8 +183,9 @@ def report_pairwise_similarity(file_names, file_contents, lang, ted_algorithm):
 
     # Fill the first row and first column with file names
     for i in range(file_number):
-        similarity_matrix[0][i + 1] = file_names[i].split("/")[-1].replace(".py", "")
-        similarity_matrix[i + 1][0] = file_names[i].split("/")[-1].replace(".py", "")
+        display_name = Path(file_names[i]).name
+        similarity_matrix[0][i + 1] = display_name
+        similarity_matrix[i + 1][0] = display_name
 
     results = []
     # Calculate similarity percentages and fill the matrix

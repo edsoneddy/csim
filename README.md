@@ -200,7 +200,7 @@ print(f"Similarity: {similarity}") # Output: Similarity: X.XX
 ## Documentation
 
 - [Getting Started Guide](GETTING_STARTED.md) - Quick tutorial for new users
-- [Search Strategies Guide](docs/STRATEGIES.md) - Detailed comparison of exhaustive vs. LSH approaches
+- [Search Strategies Guide](docs/STRATEGIES.md) - Detailed explanation of available search strategies
 - [ANTLR Parser Generation](grammars/parser_gen_guide.md) - For grammar customization
 
 ## ANTLR4 Installation and Parser/Lexer Generation

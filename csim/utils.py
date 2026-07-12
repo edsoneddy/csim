@@ -210,9 +210,11 @@ def report_pairwise_similarity(file_names, file_contents, lang, ted_algorithm):
     return "\n".join(results)
 
 
-def get_output_by_group(file_names, groups, similarity_indices, threshold):
+def get_output_by_group(file_names, groups, similarity_indices, threshold, printable_output=True):
     result = []
-    unique_files = []
+    similarity_groups = []
+    similarity_groups_avg = []
+    unique_groups = []
 
     result.append(f"Threshold: {threshold}")
     result.append(f"Total files processed: {len(file_names)}")
@@ -228,19 +230,24 @@ def get_output_by_group(file_names, groups, similarity_indices, threshold):
             )
             result.extend([file_names[file] for file in file_group])
             groups_cnt += 1
+            similarity_groups_avg.append(avg_similarity)
+            similarity_groups.append([file_names[file] for file in file_group])
         else:
-            unique_files.append(file_names[file_group[0]])
+            unique_groups.append(file_names[file_group[0]])
 
-    if unique_files:
+    if unique_groups:
         result.append(f"Unique Files (similarity below threshold):")
-        for file in unique_files:
+        for file in unique_groups:
             result.append(file)
 
-    return "\n".join(result)
+    if printable_output:
+        return "\n".join(result)
+
+    return similarity_groups, similarity_groups_avg, unique_groups
 
 
 def group_by_exhaustive_search(
-    file_names, file_contents, lang, threshold, ted_algorithm, with_output=True
+    file_names, file_contents, lang, threshold, ted_algorithm, printable_output=True
 ):
 
     file_number = len(file_names)
@@ -274,7 +281,4 @@ def group_by_exhaustive_search(
 
     groups = list(groups.values())
 
-    if with_output:
-        return get_output_by_group(file_names, groups, similarity_indices, threshold)
-    
-    return {"groups": groups, "similarity_indices": similarity_indices}
+    return get_output_by_group(file_names, groups, similarity_indices, threshold, printable_output)

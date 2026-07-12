@@ -243,7 +243,7 @@ def get_output_by_group(file_names, groups, similarity_indices, threshold, print
     if printable_output:
         return "\n".join(result)
 
-    return similarity_groups, similarity_groups_avg, unique_groups
+    return similarity_groups, similarity_groups_avg, unique_groups, "\n".join(result)
 
 
 def group_by_exhaustive_search(

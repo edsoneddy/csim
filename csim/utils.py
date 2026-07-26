@@ -235,12 +235,13 @@ def get_output_by_group(file_names, groups, similarity_indices, threshold, print
         else:
             unique_groups.append(file_names[file_group[0]])
 
-    # Sort the similarity groups by average similarity in descending order
-    similarity_groups_avg, similarity_groups = zip(
-        *sorted(
-            zip(similarity_groups_avg, similarity_groups), key=lambda x: x[0], reverse=True
+    if len(similarity_groups) > 0 and len(similarity_groups_avg) > 0:
+        # Sort the similarity groups by average similarity in descending order
+        similarity_groups_avg, similarity_groups = zip(
+            *sorted(
+                zip(similarity_groups_avg, similarity_groups), key=lambda x: x[0], reverse=True
+            )
         )
-    )
 
     if unique_groups:
         result.append(f"Unique Files (similarity below threshold):")

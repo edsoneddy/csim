@@ -38,7 +38,6 @@ EXCLUDED_TOKEN_TYPES = {
     # Irrelevant tokens
     PythonLexer.EQUAL,
 }
-
 # Rules whose children should be excluded from similarity comparison
 EXCLUDE_CHILDRENS_FROM_RULE = {
     PythonParser.RULE_for_stmt: [
@@ -52,7 +51,6 @@ EXCLUDE_CHILDRENS_FROM_RULE = {
         PythonLexer.NAME + TOKEN_TYPE_OFFSET,
     ],
 }
-
 # Collapsed Parser Rules
 COLLAPSED_RULE_INDICES = {
     # Import statements
@@ -68,7 +66,6 @@ COLLAPSED_RULE_INDICES = {
     PythonParser.RULE_dict,
     PythonParser.RULE_set,
 }
-
 # Rules to hash instead of comparing structurally
 HASHED_RULE_INDICES = {
     PythonParser.RULE_assignment,
@@ -83,16 +80,13 @@ HASHED_RULE_INDICES = {
     PythonParser.RULE_kwds,
     PythonParser.RULE_args,
 }
-
 # Rules that are considered equivalent for control flow analysis
 CONTROL_EQUIVALENCE_RULE_INDICES = {
     PythonParser.RULE_for_stmt: "LOOP",
     PythonParser.RULE_while_stmt: "LOOP",
 }
-
 # Specific rule indices for special handling
 RULE_ASSIGNMENT = PythonParser.RULE_assignment
-
 # Augmented assignments mapped to normalized forms
 ASIGN_OP_NORMALIZED = {
     "+=": [
@@ -148,3 +142,5 @@ ASIGN_OP_NORMALIZED = {
         PythonLexer.VBAR + TOKEN_TYPE_OFFSET,
     ],
 }
+# Rules to exclude from structural comparison
+EXCLUDED_RULE_TYPES = set()

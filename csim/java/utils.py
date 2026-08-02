@@ -2,19 +2,6 @@ from .Java20Lexer import Java20Lexer
 from .Java20Parser import Java20Parser
 from antlr4 import Token
 
-COLLAPSED_RULE_INDICES = {
-    # Import declarations
-    Java20Parser.RULE_singleTypeImportDeclaration,
-    Java20Parser.RULE_typeImportOnDemandDeclaration,
-    Java20Parser.RULE_singleStaticImportDeclaration,
-    Java20Parser.RULE_staticImportOnDemandDeclaration,
-    # Miscellaneous declarations
-    Java20Parser.RULE_variableInitializerList,
-    # Array dimensions
-    Java20Parser.RULE_dims,
-    Java20Parser.RULE_dimExpr,
-}
-
 EXCLUDED_TOKEN_TYPES = {
     # Punctuation that does not contribute to structural similarity
     Java20Lexer.LPAREN,
@@ -58,3 +45,19 @@ EXCLUDED_TOKEN_TYPES = {
     # Whitespace and comments
     Token.EOF,
 }
+EXCLUDE_CHILDRENS_FROM_RULE = dict()
+COLLAPSED_RULE_INDICES = {
+    # Import declarations
+    Java20Parser.RULE_singleTypeImportDeclaration,
+    Java20Parser.RULE_typeImportOnDemandDeclaration,
+    Java20Parser.RULE_singleStaticImportDeclaration,
+    Java20Parser.RULE_staticImportOnDemandDeclaration,
+    # Miscellaneous declarations
+    Java20Parser.RULE_variableInitializerList,
+    # Array dimensions
+    Java20Parser.RULE_dims,
+    Java20Parser.RULE_dimExpr,
+}
+HASHED_RULE_INDICES = set()
+CONTROL_EQUIVALENCE_RULE_INDICES = dict()
+EXCLUDED_RULE_TYPES = set()

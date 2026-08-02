@@ -11,6 +11,7 @@ from ..utils import (
     get_exclude_childrens_from_rule,
     get_excluded_token_types,
     get_hash_rule_indices,
+    get_excluded_rule_types,
 )
 
 
@@ -37,9 +38,10 @@ def get_parser_visitor_class(lang):
         This class can be further customized to implement language-specific normalization logic.
         """
 
-        def __init__(self, excluded_token_types):
+        def __init__(self, excluded_token_types, excluded_rule_types):
             super().__init__()
             self.excluded_token_types = excluded_token_types
+            self.excluded_rule_types = excluded_rule_types
 
         def visitChildren(self, node):
             """Visit and process all children of a parse tree node.
@@ -63,7 +65,7 @@ def get_parser_visitor_class(lang):
                                 "children": [],
                             }
                         )
-                else:
+                elif child.getRuleIndex() not in self.excluded_rule_types:
                     result = self.visit(child)
                     if result is not None:
                         children_nodes.append(result)
@@ -174,10 +176,11 @@ def Normalize(tree, lang):
         dict: A normalized tree represented as a dictionary with 'label' and 'children' keys.
     """
     excluded_token_types = get_excluded_token_types(lang)
+    excluded_rule_types = get_excluded_rule_types(lang)
 
     # Get the correct ParserVisitor class for the given language
     ParserVisitorClass = get_parser_visitor_class(lang)
-    visitor = ParserVisitorClass(excluded_token_types)
+    visitor = ParserVisitorClass(excluded_token_types, excluded_rule_types)
 
     normalized_tree = visitor.visit(tree)
 

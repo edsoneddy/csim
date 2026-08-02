@@ -2,8 +2,6 @@ from .CPP14Lexer import CPP14Lexer
 from .CPP14Parser import CPP14Parser
 from antlr4 import Token
 
-COLLAPSED_RULE_INDICES = set()
-
 EXCLUDED_TOKEN_TYPES = {
     # Punctuation that does not contribute to structural similarity
     CPP14Lexer.LeftParen,
@@ -52,3 +50,8 @@ EXCLUDED_TOKEN_TYPES = {
     # Whitespace and comments
     Token.EOF,
 }
+EXCLUDE_CHILDRENS_FROM_RULE = dict()
+COLLAPSED_RULE_INDICES = set()
+HASHED_RULE_INDICES = set()
+CONTROL_EQUIVALENCE_RULE_INDICES = dict()
+EXCLUDED_RULE_TYPES = set()

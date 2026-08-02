@@ -91,6 +91,29 @@ def get_excluded_token_types(lang):
     else:
         return set()  # Default to empty set for unsupported languages
 
+def get_excluded_rule_types(lang):
+    """Retrieve excluded rule types based on the programming language.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        set: Set of excluded rule types.
+    """
+    if lang == "python":
+        from .python.utils import EXCLUDED_RULE_TYPES as python_excluded
+
+        return python_excluded
+    elif lang == "java":
+        from .java.utils import EXCLUDED_RULE_TYPES as java_excluded
+
+        return java_excluded
+    elif lang == "cpp":
+        from .cpp.utils import EXCLUDED_RULE_TYPES as cpp_excluded
+
+        return cpp_excluded
+    else:
+        return set()  # Default to empty set for unsupported languages
 
 def get_hash_rule_indices(lang):
     """Retrieve hashed rule indices based on the programming language.
@@ -101,8 +124,13 @@ def get_hash_rule_indices(lang):
     """
     if lang == "python":
         from .python.utils import HASHED_RULE_INDICES as python_hashed_rules
-
         return python_hashed_rules
+    if lang == "java":
+        from .java.utils import HASHED_RULE_INDICES as java_hashed_rules
+        return java_hashed_rules
+    if lang == "cpp":
+        from .cpp.utils import HASHED_RULE_INDICES as cpp_hashed_rules
+        return cpp_hashed_rules
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -120,8 +148,17 @@ def get_exclude_childrens_from_rule(lang):
         from .python.utils import (
             EXCLUDE_CHILDRENS_FROM_RULE as python_exclude_childrens_from_rule,
         )
-
         return python_exclude_childrens_from_rule
+    if lang == "java":
+        from .java.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as java_exclude_childrens_from_rule,
+        )
+        return java_exclude_childrens_from_rule
+    if lang == "cpp":
+        from .cpp.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as cpp_exclude_childrens_from_rule,
+        )
+        return cpp_exclude_childrens_from_rule
     else:
         return dict()  # Default to empty dict for unsupported languages
 
@@ -139,8 +176,17 @@ def get_control_equivalence_rule_indices(lang):
         from .python.utils import (
             CONTROL_EQUIVALENCE_RULE_INDICES as python_control_equivalence_rules,
         )
-
         return python_control_equivalence_rules
+    if lang == "java":
+        from .java.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as java_control_equivalence_rules,
+        )
+        return java_control_equivalence_rules
+    if lang == "cpp":
+        from .cpp.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as cpp_control_equivalence_rules,
+        )
+        return cpp_control_equivalence_rules
     else:
         return dict()  # Default to empty dict for unsupported languages
 

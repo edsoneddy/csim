@@ -35,8 +35,10 @@ EXCLUDED_TOKEN_TYPES = {
     PythonLexer.RAISE,
     PythonLexer.GLOBAL,
     PythonLexer.WITH,
+    PythonLexer.AS,
     # Irrelevant tokens
     PythonLexer.EQUAL,
+    PythonLexer.NAME,
 }
 # Rules whose children should be excluded from similarity comparison
 EXCLUDE_CHILDRENS_FROM_RULE = {
@@ -143,4 +145,7 @@ ASIGN_OP_NORMALIZED = {
     ],
 }
 # Rules to exclude from structural comparison
-EXCLUDED_RULE_TYPES = set()
+EXCLUDED_RULE_TYPES = {
+    PythonParser.RULE_name,
+    PythonParser.RULE_name_except_underscore,
+}

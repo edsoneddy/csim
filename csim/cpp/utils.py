@@ -85,8 +85,7 @@ EXCLUDED_TOKEN_TYPES = {
 }
 EXCLUDE_CHILDRENS_FROM_RULE = dict()
 COLLAPSED_RULE_INDICES = {
-    # Translation-unit and statement list wrappers
-    CPP14Parser.RULE_declarationseq,
+    # Statement list wrappers
     CPP14Parser.RULE_statementSeq,
     # Common list wrappers
     CPP14Parser.RULE_expressionList,

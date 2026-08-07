@@ -59,7 +59,7 @@ pip install csim
 
 For detailed information about search strategies, see: [docs/STRATEGIES.md](docs/STRATEGIES.md)
 
-csim supports two main actions: **report** (for pairwise similarity analysis) and **group** (for clustering similar files). The tool supports Python, Java, and C++ source code files.
+csim supports three main actions: **report** (for pairwise similarity analysis), **group** (for clustering similar files), and **tree**/**view** (for visualizing a file's normalized/pruned parse tree). The tool supports Python, Java, and C++ source code files.
 
 ### General Command Structure
 ```sh
@@ -134,6 +134,43 @@ csim group --path /path/to/directory --threshold 0.8 --strategy exhaustive
 **Complete example:**
 ```sh
 csim group --path /path/to/directory --threshold 0.9 --strategy exhaustive --lang python --talg apted
+```
+
+### Action 3: `tree` (alias: `view`) - Visualize Parse Trees
+
+Prints the normalized/pruned tree for a single file — the exact tree that gets passed to the tree edit distance algorithm. Useful for debugging how the normalization, collapsing, and hashing rules affect a specific file before it's compared against others.
+
+```sh
+csim tree --path /path/to/file.py --lang python
+```
+
+**Example Output:**
+```
+=== Normalized + Pruned Tree (input to Tree Edit Distance) ===
+statements
+   function_def_raw
+      param [hashed:e3b0c442]
+      statements
+         STRING
+         if_stmt
+            comparison [hashed:93e10dca]
+            return_stmt [hashed:337adaa9]
+   assignment [hashed:118045cc]
+   primary [hashed:e1b0c7ab]
+
+Total nodes after pruning: 24
+```
+
+Rule and token names are resolved for readability, `LOOP` marks nodes collapsed under control-flow equivalence (e.g. `for`/`while`), and `[hashed:xxxxxxxx]` marks subtrees that were hashed into a single node instead of compared structurally.
+
+**Options:**
+- `--path, -p`: Path to a single source code file (**required**).
+- `--lang, -l`: Programming language (default: `python`). Options: `python`, `java`, `cpp`
+- `--show-raw`: Also print the raw ANTLR parse tree before normalization/pruning, for side-by-side comparison.
+
+**Example with `--show-raw`:**
+```sh
+csim tree --path /path/to/file.py --lang python --show-raw
 ```
 
 ### Language Support

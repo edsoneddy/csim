@@ -10,12 +10,133 @@ def get_file(file_path):
     return file_path
 
 
-def print_tree(node, indent=0):
+def get_rule_names(lang):
+    """Retrieve the parser rule names for a language, indexed by rule index.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        list: Rule names indexed by rule index, or None if unavailable.
+    """
+    if lang == "python":
+        from .python.PythonParser import PythonParser
+        return PythonParser.ruleNames
+    elif lang == "java":
+        from .java.Java20Parser import Java20Parser
+        return Java20Parser.ruleNames
+    elif lang == "cpp":
+        from .cpp.CPP14Parser import CPP14Parser
+        return CPP14Parser.ruleNames
+    else:
+        return None
+
+
+def get_symbolic_names(lang):
+    """Retrieve the lexer symbolic token names for a language, indexed by token type.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        list: Symbolic token names indexed by token type, or None if unavailable.
+    """
+    if lang == "python":
+        from .python.PythonLexer import PythonLexer
+        return PythonLexer.symbolicNames
+    elif lang == "java":
+        from .java.Java20Lexer import Java20Lexer
+        return Java20Lexer.symbolicNames
+    elif lang == "cpp":
+        from .cpp.CPP14Lexer import CPP14Lexer
+        return CPP14Lexer.symbolicNames
+    else:
+        return None
+
+
+def format_label(label, rule_names=None, symbolic_names=None):
+    """Resolve a normalized-tree label to a human-readable string.
+
+    A label is either a rule index (int), a token type offset by
+    TOKEN_TYPE_OFFSET (int), a control-equivalence tag such as "LOOP" (str),
+    or a hashed subtree digest in the form "<label>|<hexdigest>" (str).
+
+    Args:
+        label: The node label to resolve.
+        rule_names: Parser rule names indexed by rule index, or None.
+        symbolic_names: Lexer symbolic token names indexed by token type, or None.
+
+    Returns:
+        str: Human-readable representation of the label.
+    """
+    if isinstance(label, str):
+        if "|" in label:
+            prefix, digest = label.split("|", 1)
+            if rule_names and prefix.isdigit() and int(prefix) < len(rule_names):
+                prefix = rule_names[int(prefix)]
+            return f"{prefix} [hashed:{digest[:8]}]"
+        return label
+    if isinstance(label, int):
+        if label >= TOKEN_TYPE_OFFSET:
+            token_type = label - TOKEN_TYPE_OFFSET
+            if symbolic_names and 0 <= token_type < len(symbolic_names):
+                return symbolic_names[token_type]
+            return f"TOKEN<{token_type}>"
+        if rule_names and 0 <= label < len(rule_names):
+            return rule_names[label]
+    return str(label)
+
+
+def print_tree(node, indent=0, lang=None):
+    """Print a normalized/pruned tree with visual indentation.
+
+    Args:
+        node: A dict-based tree with "label" and "children" keys.
+        indent (int): Current indentation depth.
+        lang (str): If given, resolve labels to rule/token names for readability.
+    """
     if node is None:
         return
-    print("   " * indent + str(node["label"]))
-    for child in node["children"]:
-        print_tree(child, indent + 1)
+
+    rule_names = get_rule_names(lang) if lang else None
+    symbolic_names = get_symbolic_names(lang) if lang else None
+
+    def _print(n, depth):
+        print("   " * depth + format_label(n["label"], rule_names, symbolic_names))
+        for child in n["children"]:
+            _print(child, depth + 1)
+
+    _print(node, indent)
+
+
+def print_antlr_tree(node, lang, indent=0):
+    """Print a raw ANTLR parse tree with visual indentation, resolving rule names
+    and printing terminal token text as leaves.
+
+    Args:
+        node: ANTLR parse tree node (rule context or terminal node).
+        lang (str): Programming language identifier, used to resolve rule names.
+        indent (int): Current indentation depth.
+    """
+    from antlr4 import TerminalNode
+
+    rule_names = get_rule_names(lang)
+
+    def _print(n, depth):
+        if isinstance(n, TerminalNode):
+            print("   " * depth + repr(n.getText()))
+            return
+        rule_index = n.getRuleIndex()
+        label = (
+            rule_names[rule_index]
+            if rule_names and 0 <= rule_index < len(rule_names)
+            else str(rule_index)
+        )
+        print("   " * depth + label)
+        for child in n.getChildren():
+            _print(child, depth + 1)
+
+    _print(node, indent)
 
 
 def get_file(file_path):

@@ -8,7 +8,7 @@ def Compare(
     content_a="",
     name_b="Snippet B",
     content_b="",
-    lang="python",
+    lang="python_3_13",
     ted_algorithm="zss",
 ):
     """Compare two Python code snippets and compute their similarity.
@@ -25,7 +25,7 @@ def Compare(
         content_a: First Python code snippet as a string.
         name_b: Name of the second code snippet (used for error reporting).
         content_b: Second Python code snippet as a string.
-        lang: Programming language of the code snippets (default is "python").
+        lang: Programming language of the code snippets (default is "python_3_13").
         ted_algorithm: The tree edit distance algorithm to use ('zss' or 'apted').
     Returns:
         float: Similarity score in the range [0, 1], where 1 indicates

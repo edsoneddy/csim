@@ -75,7 +75,7 @@ csim group --path ./small_dataset --threshold 0.8
 
 ### Use Case 1: Detect Plagiarism in Programming Assignments
 
-You have 30 Python submissions for a programming assignment:
+You have 30 Python 3.13 submissions for a programming assignment:
 
 ```bash
 # Generate a report to see all similarities
@@ -105,7 +105,7 @@ Find copy-pasted functions or redundant code in a codebase:
 
 ```bash
 # Threshold 0.80 = significantly similar (possible refactoring opportunity)
-csim group --path ./src --threshold 0.80 --lang java
+csim group --path ./src --threshold 0.80 --lang java_20
 ```
 
 ---
@@ -129,19 +129,19 @@ The `--threshold` parameter determines how similar files must be to be considere
 
 csim supports three programming languages:
 
-### Python
+### Python 3.13
 ```bash
-csim report --path ./python_files --lang python
+csim report --path ./python_files --lang python_3_13
 ```
 
-### Java
+### Java 20
 ```bash
-csim report --path ./java_files --lang java
+csim report --path ./java_files --lang java_20
 ```
 
-### C++
+### C++14
 ```bash
-csim report --path ./cpp_files --lang cpp
+csim report --path ./cpp_files --lang cpp_14
 ```
 
 ---
@@ -161,11 +161,11 @@ csim group --path ./files --threshold 0.8 --talg apted
 ### Combine Options
 
 ```bash
-# Large Java assignment dataset (exhaustive search with apted algorithm)
+# Large Java 20 assignment dataset (exhaustive search with apted algorithm)
 csim group --path ./java_submissions \
   --threshold 0.8 \
   --strategy exhaustive \
-  --lang java \
+  --lang java_20 \
   --talg apted
 ```
 
@@ -190,7 +190,7 @@ file_contents = [
 results = report_pairwise_similarity(
     file_names=file_names,
     file_contents=file_contents,
-    lang="python",
+    lang="python_3_13",
     ted_algorithm="zss"
 )
 
@@ -207,7 +207,7 @@ print(results)
 csim report --path ./my_directory
 ```
 
-**Solution:** Make sure the directory contains files with the correct extension (`.py` for Python, `.java` for Java, `.cpp` for C++).
+**Solution:** Make sure the directory contains files with the correct extension (`.py` for Python 3.13, `.java` for Java 20, `.cpp` for C++14).
 
 ### Issue: Command not found
 

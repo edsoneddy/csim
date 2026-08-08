@@ -13,7 +13,7 @@ def test_cli_report_action():
     """
     test_dir = "test/files/"
 
-    command = [CSIM_EXECUTABLE, "report", "-p", test_dir, "-l", "python"]
+    command = [CSIM_EXECUTABLE, "report", "-p", test_dir, "-l", "python_3_13"]
 
     result = subprocess.run(command, capture_output=True, text=True, check=False)
 
@@ -31,7 +31,7 @@ def test_cli_group_action_exhaustive():
     """
     test_dir = "test/files/"
 
-    command = [CSIM_EXECUTABLE, "group", "-p", test_dir, "-t", "0.8", "-l", "python", "-s", "exhaustive"]
+    command = [CSIM_EXECUTABLE, "group", "-p", test_dir, "-t", "0.8", "-l", "python_3_13", "-s", "exhaustive"]
 
     result = subprocess.run(command, capture_output=True, text=True, check=False)
 
@@ -53,7 +53,7 @@ def test_cli_group_action_default_strategy():
     """
     test_dir = "test/files/"
 
-    command = [CSIM_EXECUTABLE, "group", "-p", test_dir, "-t", "0.8", "-l", "python"]
+    command = [CSIM_EXECUTABLE, "group", "-p", test_dir, "-t", "0.8", "-l", "python_3_13"]
 
     result = subprocess.run(command, capture_output=True, text=True, check=False)
 
@@ -70,7 +70,7 @@ def test_cli_group_missing_threshold():
     """
     test_dir = "test/files/"
 
-    command = [CSIM_EXECUTABLE, "group", "-p", test_dir, "-l", "python"]
+    command = [CSIM_EXECUTABLE, "group", "-p", test_dir, "-l", "python_3_13"]
 
     result = subprocess.run(command, capture_output=True, text=True, check=False)
 
@@ -84,7 +84,7 @@ def test_cli_report_invalid_path():
     """
     Testing that the CLI fails when the provided path does not exist.
     """
-    command = [CSIM_EXECUTABLE, "report", "-p", "test/does-not-exist", "-l", "python"]
+    command = [CSIM_EXECUTABLE, "report", "-p", "test/does-not-exist", "-l", "python_3_13"]
 
     result = subprocess.run(command, capture_output=True, text=True, check=False)
 
@@ -106,7 +106,7 @@ def test_cli_group_transitive_cluster(tmp_path: Path):
     for file_name, content in samples.items():
         (tmp_path / file_name).write_text(content)
 
-    command = [CSIM_EXECUTABLE, "group", "-p", str(tmp_path), "-t", "0.67", "-l", "python"]
+    command = [CSIM_EXECUTABLE, "group", "-p", str(tmp_path), "-t", "0.67", "-l", "python_3_13"]
 
     result = subprocess.run(command, capture_output=True, text=True, check=False)
 

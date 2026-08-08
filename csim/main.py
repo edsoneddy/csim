@@ -23,19 +23,19 @@ def main():
 
     Arguments for 'report' action:
         --path, -p (str): Path to a directory containing source code files (required).
-        --lang, -l (str): The programming language of the source files (default: 'python').
+        --lang, -l (str): The programming language of the source files (default: 'python_3_13').
         --talg, -ta (str): The tree edit distance algorithm to use (default: 'zss').
 
     Arguments for 'group' action:
         --path, -p (str): Path to a directory containing source code files (required).
         --threshold, -t (float): Similarity threshold between 0.0 and 1.0 (required).
         --strategy, -s (str): Grouping strategy: 'exhaustive' (default).
-        --lang, -l (str): The programming language of the source files (default: 'python').
+        --lang, -l (str): The programming language of the source files (default: 'python_3_13').
         --talg, -ta (str): The tree edit distance algorithm to use (default: 'zss').
 
     Arguments for 'tree'/'view' action:
         --path, -p (str): Path to a single source code file (required).
-        --lang, -l (str): The programming language of the source file (default: 'python').
+        --lang, -l (str): The programming language of the source file (default: 'python_3_13').
         --show-raw: Also print the raw ANTLR parse tree before normalization/pruning.
 
     Returns:
@@ -66,9 +66,9 @@ def main():
     parser.add_argument(
         "--lang",
         "-l",
-        choices=["python", "java", "cpp"],
-        default="python",
-        help="The programming language of the source files (default: python).",
+        choices=["python_3_13", "java_20", "cpp_14"],
+        default="python_3_13",
+        help="The programming language of the source files (default: python_3_13).",
     )
 
     # Algorithm for tree edit distance

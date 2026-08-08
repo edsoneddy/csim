@@ -55,26 +55,26 @@
 
 3.  **Generate Parser and Lexer**
 
-    Generate the parser and lexer files using the following commands from the `grammars` directory. This will output the generated files into the `csim/python` directory.
+    Generate the parser and lexer files using the following commands from the `grammars` directory. This will output the generated files into the `csim/python_3_13` directory.
     ```sh
-    antlr4 PythonLexer.g4 -Dlanguage=Python3 -visitor -no-listener -o ../csim/python
-    antlr4 PythonParser.g4 -Dlanguage=Python3 -visitor -no-listener -o ../csim/python
+    antlr4 PythonLexer.g4 -Dlanguage=Python3 -visitor -no-listener -o ../csim/python_3_13
+    antlr4 PythonParser.g4 -Dlanguage=Python3 -visitor -no-listener -o ../csim/python_3_13
     ```
     *   `-Dlanguage=Python3`: Specifies that the generated code should be for Python 3.
     *   `-visitor`: Generates a visitor class for traversing the parse tree.
     *   `-no-listener`: Disables the generation of listener classes.
-    *   `-o csim/python`: Sets the output directory for the generated files.
+    *   `-o csim/python_3_13`: Sets the output directory for the generated files.
 
 4.  **Download Lexer Base Class**
 
-    The Python grammar requires a base class for the lexer. Download the `PythonLexerBase.py` file from the repository and place it in the `csim/python` directory. Run the following command from the root of the project (example for Python 3.13):
+    The Python grammar requires a base class for the lexer. Download the `PythonLexerBase.py` file from the repository and place it in the `csim/python_3_13` directory. Run the following command from the root of the project (example for Python 3.13):
     ```sh
-    curl -o csim/python/PythonLexerBase.py https://raw.githubusercontent.com/antlr/grammars-v4/refs/heads/master/python/python3_13/Python3/PythonLexerBase.py
+    curl -o csim/python_3_13/PythonLexerBase.py https://raw.githubusercontent.com/antlr/grammars-v4/refs/heads/master/python/python3_13/Python3/PythonLexerBase.py
     ```
 
 5.  **Verify Generated Files**
 
-    Verify that the generated files (`PythonLexer.py`, `PythonParser.py`, etc.) and the `PythonLexerBase.py` file are present in the `csim/python` directory.
+    Verify that the generated files (`PythonLexer.py`, `PythonParser.py`, etc.) and the `PythonLexerBase.py` file are present in the `csim/python_3_13` directory.
 
 Note: In this project, generated parser/lexer files are already included; regenerating them is optional.
 

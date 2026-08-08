@@ -19,14 +19,14 @@ def get_rule_names(lang):
     Returns:
         list: Rule names indexed by rule index, or None if unavailable.
     """
-    if lang == "python":
-        from .python.PythonParser import PythonParser
+    if lang == "python_3_13":
+        from .python_3_13.PythonParser import PythonParser
         return PythonParser.ruleNames
-    elif lang == "java":
-        from .java.Java20Parser import Java20Parser
+    elif lang == "java_20":
+        from .java_20.Java20Parser import Java20Parser
         return Java20Parser.ruleNames
-    elif lang == "cpp":
-        from .cpp.CPP14Parser import CPP14Parser
+    elif lang == "cpp_14":
+        from .cpp_14.CPP14Parser import CPP14Parser
         return CPP14Parser.ruleNames
     else:
         return None
@@ -41,14 +41,14 @@ def get_symbolic_names(lang):
     Returns:
         list: Symbolic token names indexed by token type, or None if unavailable.
     """
-    if lang == "python":
-        from .python.PythonLexer import PythonLexer
+    if lang == "python_3_13":
+        from .python_3_13.PythonLexer import PythonLexer
         return PythonLexer.symbolicNames
-    elif lang == "java":
-        from .java.Java20Lexer import Java20Lexer
+    elif lang == "java_20":
+        from .java_20.Java20Lexer import Java20Lexer
         return Java20Lexer.symbolicNames
-    elif lang == "cpp":
-        from .cpp.CPP14Lexer import CPP14Lexer
+    elif lang == "cpp_14":
+        from .cpp_14.CPP14Lexer import CPP14Lexer
         return CPP14Lexer.symbolicNames
     else:
         return None
@@ -156,11 +156,11 @@ def read_file(file_path):
 
 
 def get_extension_by_lang(lang):
-    if lang == "python":
+    if lang == "python_3_13":
         return ".py"
-    elif lang == "java":
+    elif lang == "java_20":
         return ".java"
-    elif lang == "cpp":
+    elif lang == "cpp_14":
         return ".cpp"
     else:
         raise ValueError(f"Unsupported language: {lang}")
@@ -197,18 +197,18 @@ def get_excluded_token_types(lang):
     Returns:
         set: Set of excluded token types.
     """
-    if lang == "python":
-        from .python.utils import EXCLUDED_TOKEN_TYPES as python_excluded
+    if lang == "python_3_13":
+        from .python_3_13.utils import EXCLUDED_TOKEN_TYPES as python_3_13_excluded
 
-        return python_excluded
-    elif lang == "java":
-        from .java.utils import EXCLUDED_TOKEN_TYPES as java_excluded
+        return python_3_13_excluded
+    elif lang == "java_20":
+        from .java_20.utils import EXCLUDED_TOKEN_TYPES as java_20_excluded
 
-        return java_excluded
-    elif lang == "cpp":
-        from .cpp.utils import EXCLUDED_TOKEN_TYPES as cpp_excluded
+        return java_20_excluded
+    elif lang == "cpp_14":
+        from .cpp_14.utils import EXCLUDED_TOKEN_TYPES as cpp_14_excluded
 
-        return cpp_excluded
+        return cpp_14_excluded
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -221,18 +221,18 @@ def get_excluded_rule_types(lang):
     Returns:
         set: Set of excluded rule types.
     """
-    if lang == "python":
-        from .python.utils import EXCLUDED_RULE_TYPES as python_excluded
+    if lang == "python_3_13":
+        from .python_3_13.utils import EXCLUDED_RULE_TYPES as python_3_13_excluded
 
-        return python_excluded
-    elif lang == "java":
-        from .java.utils import EXCLUDED_RULE_TYPES as java_excluded
+        return python_3_13_excluded
+    elif lang == "java_20":
+        from .java_20.utils import EXCLUDED_RULE_TYPES as java_20_excluded
 
-        return java_excluded
-    elif lang == "cpp":
-        from .cpp.utils import EXCLUDED_RULE_TYPES as cpp_excluded
+        return java_20_excluded
+    elif lang == "cpp_14":
+        from .cpp_14.utils import EXCLUDED_RULE_TYPES as cpp_14_excluded
 
-        return cpp_excluded
+        return cpp_14_excluded
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -243,15 +243,15 @@ def get_hash_rule_indices(lang):
     Returns:
         set: Set of hashed rule indices.
     """
-    if lang == "python":
-        from .python.utils import HASHED_RULE_INDICES as python_hashed_rules
-        return python_hashed_rules
-    if lang == "java":
-        from .java.utils import HASHED_RULE_INDICES as java_hashed_rules
-        return java_hashed_rules
-    if lang == "cpp":
-        from .cpp.utils import HASHED_RULE_INDICES as cpp_hashed_rules
-        return cpp_hashed_rules
+    if lang == "python_3_13":
+        from .python_3_13.utils import HASHED_RULE_INDICES as python_3_13_hashed_rules
+        return python_3_13_hashed_rules
+    if lang == "java_20":
+        from .java_20.utils import HASHED_RULE_INDICES as java_20_hashed_rules
+        return java_20_hashed_rules
+    if lang == "cpp_14":
+        from .cpp_14.utils import HASHED_RULE_INDICES as cpp_14_hashed_rules
+        return cpp_14_hashed_rules
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -265,21 +265,21 @@ def get_exclude_childrens_from_rule(lang):
     Returns:
         dict: Dictionary mapping rule indices to lists of child indices to exclude.
     """
-    if lang == "python":
-        from .python.utils import (
-            EXCLUDE_CHILDRENS_FROM_RULE as python_exclude_childrens_from_rule,
+    if lang == "python_3_13":
+        from .python_3_13.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as python_3_13_exclude_childrens_from_rule,
         )
-        return python_exclude_childrens_from_rule
-    if lang == "java":
-        from .java.utils import (
-            EXCLUDE_CHILDRENS_FROM_RULE as java_exclude_childrens_from_rule,
+        return python_3_13_exclude_childrens_from_rule
+    if lang == "java_20":
+        from .java_20.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as java_20_exclude_childrens_from_rule,
         )
-        return java_exclude_childrens_from_rule
-    if lang == "cpp":
-        from .cpp.utils import (
-            EXCLUDE_CHILDRENS_FROM_RULE as cpp_exclude_childrens_from_rule,
+        return java_20_exclude_childrens_from_rule
+    if lang == "cpp_14":
+        from .cpp_14.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as cpp_14_exclude_childrens_from_rule,
         )
-        return cpp_exclude_childrens_from_rule
+        return cpp_14_exclude_childrens_from_rule
     else:
         return dict()  # Default to empty dict for unsupported languages
 
@@ -293,26 +293,26 @@ def get_control_equivalence_rule_indices(lang):
     Returns:
         dict: Dictionary mapping rule indices to their equivalence classes for control flow analysis.
     """
-    if lang == "python":
-        from .python.utils import (
-            CONTROL_EQUIVALENCE_RULE_INDICES as python_control_equivalence_rules,
+    if lang == "python_3_13":
+        from .python_3_13.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as python_3_13_control_equivalence_rules,
         )
-        return python_control_equivalence_rules
-    if lang == "java":
-        from .java.utils import (
-            CONTROL_EQUIVALENCE_RULE_INDICES as java_control_equivalence_rules,
+        return python_3_13_control_equivalence_rules
+    if lang == "java_20":
+        from .java_20.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as java_20_control_equivalence_rules,
         )
-        return java_control_equivalence_rules
-    if lang == "cpp":
-        from .cpp.utils import (
-            CONTROL_EQUIVALENCE_RULE_INDICES as cpp_control_equivalence_rules,
+        return java_20_control_equivalence_rules
+    if lang == "cpp_14":
+        from .cpp_14.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as cpp_14_control_equivalence_rules,
         )
-        return cpp_control_equivalence_rules
+        return cpp_14_control_equivalence_rules
     else:
         return dict()  # Default to empty dict for unsupported languages
 
 
-def preprocess_code(file_name, file_content, lang="python"):
+def preprocess_code(file_name, file_content, lang="python_3_13"):
     # Local import to avoid circular dependency at module import time
     from .CodeSimilarity import ANTLR_parse, Normalize, PruneAndHash
 

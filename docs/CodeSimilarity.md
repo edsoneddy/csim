@@ -1,11 +1,11 @@
 # csim
 
-This project analyzes structural similarity between Python source code using
+This project analyzes structural similarity between Python 3.13 source code using
 ANTLR4-generated Parse Trees and Tree Edit Distance (ZSS or APTED).
 
 ## Parse Tree Normalization and ZSS Tree Construction
 
-This project compares Python source code by measuring **structural similarity**
+This project compares Python 3.13 source code by measuring **structural similarity**
 between normalized Parse Trees.
 The Parse Trees are generated using **ANTLR4** and compared using
 **Tree Edit Distance (ZSS or APTED)**

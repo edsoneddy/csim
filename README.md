@@ -13,7 +13,7 @@ Code Similarity (csim) provide a module designed to detect similarities between 
 - **Parse Trees:** Represents the syntactic structure of source code, enabling detailed comparisons.
 - **Tree Edit Distance:** Measures the similarity between different code structures.
 - **Hash-Based Pruning:** Optimizes the comparison process by reducing tree size while preserving essential structure.
-- **Multi-Language Support:** Supports Python, Java, and C++ source code analysis.
+- **Multi-Language Support:** Supports Python 3.13, Java 20, and C++14 source code analysis.
 
 ## Technologies Used
 
@@ -59,7 +59,7 @@ pip install csim
 
 For detailed information about search strategies, see: [docs/STRATEGIES.md](docs/STRATEGIES.md)
 
-csim supports three main actions: **report** (for pairwise similarity analysis), **group** (for clustering similar files), and **tree**/**view** (for visualizing a file's normalized/pruned parse tree). The tool supports Python, Java, and C++ source code files.
+csim supports three main actions: **report** (for pairwise similarity analysis), **group** (for clustering similar files), and **tree**/**view** (for visualizing a file's normalized/pruned parse tree). The tool supports Python 3.13, Java 20, and C++14 source code files.
 
 ### General Command Structure
 ```sh
@@ -82,12 +82,12 @@ file2.py is similar to file3.py with similarity index: 0.50
 ```
 
 **Options:**
-- `--lang, -l`: Programming language (default: `python`). Options: `python`, `java`, `cpp`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `cpp_14`
 - `--talg, -ta`: Tree edit distance algorithm (default: `zss`). Options: `zss`, `apted`
 
 **Example with options:**
 ```sh
-csim report --path /path/to/directory --lang java --talg apted
+csim report --path /path/to/directory --lang java_20 --talg apted
 ```
 
 ### Action 2: `group` - Group Files by Similarity
@@ -128,12 +128,12 @@ csim group --path /path/to/directory --threshold 0.8 --strategy exhaustive
 
 - `--threshold, -t`: Similarity threshold (0.0 to 1.0). **Required.**
 - `--strategy, -s`: Grouping strategy (default: `exhaustive`). Options: `exhaustive`
-- `--lang, -l`: Programming language (default: `python`). Options: `python`, `java`, `cpp`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `cpp_14`
 - `--talg, -ta`: Tree edit distance algorithm (default: `zss`). Options: `zss`, `apted`
 
 **Complete example:**
 ```sh
-csim group --path /path/to/directory --threshold 0.9 --strategy exhaustive --lang python --talg apted
+csim group --path /path/to/directory --threshold 0.9 --strategy exhaustive --lang python_3_13 --talg apted
 ```
 
 ### Action 3: `tree` (alias: `view`) - Visualize Parse Trees
@@ -141,7 +141,7 @@ csim group --path /path/to/directory --threshold 0.9 --strategy exhaustive --lan
 Prints the normalized/pruned tree for a single file — the exact tree that gets passed to the tree edit distance algorithm. Useful for debugging how the normalization, collapsing, and hashing rules affect a specific file before it's compared against others.
 
 ```sh
-csim tree --path /path/to/file.py --lang python
+csim tree --path /path/to/file.py --lang python_3_13
 ```
 
 **Example Output:**
@@ -165,31 +165,31 @@ Rule and token names are resolved for readability, `LOOP` marks nodes collapsed 
 
 **Options:**
 - `--path, -p`: Path to a single source code file (**required**).
-- `--lang, -l`: Programming language (default: `python`). Options: `python`, `java`, `cpp`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `cpp_14`
 - `--show-raw`: Also print the raw ANTLR parse tree before normalization/pruning, for side-by-side comparison.
 
 **Example with `--show-raw`:**
 ```sh
-csim tree --path /path/to/file.py --lang python --show-raw
+csim tree --path /path/to/file.py --lang python_3_13 --show-raw
 ```
 
 ### Language Support
 
 The tool supports the following programming languages:
 
-**Python:**
+**Python 3.13:**
 ```sh
-csim report --path /path/to/python/files --lang python
+csim report --path /path/to/python/files --lang python_3_13
 ```
 
-**Java:**
+**Java 20:**
 ```sh
-csim report --path /path/to/java/files --lang java
+csim report --path /path/to/java/files --lang java_20
 ```
 
-**C++:**
+**C++14:**
 ```sh
-csim report --path /path/to/cpp/files --lang cpp
+csim report --path /path/to/cpp/files --lang cpp_14
 ```
 
 ### Threshold Guidance
@@ -215,7 +215,7 @@ file_contents = [code1, code2, code3]
 results = group_by_exhaustive_search(
     file_names=file_names,
     file_contents=file_contents,
-    lang="python",
+    lang="python_3_13",
     threshold=0.8,
     ted_algorithm="zss"
 )

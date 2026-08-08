@@ -1,10 +1,10 @@
 import sys
-from ..python.PythonParser import PythonParser
-from ..python.PythonLexer import PythonLexer
-from ..java.Java20Parser import Java20Parser
-from ..java.Java20Lexer import Java20Lexer
-from ..cpp.CPP14Parser import CPP14Parser
-from ..cpp.CPP14Lexer import CPP14Lexer
+from ..python_3_13.PythonParser import PythonParser
+from ..python_3_13.PythonLexer import PythonLexer
+from ..java_20.Java20Parser import Java20Parser
+from ..java_20.Java20Lexer import Java20Lexer
+from ..cpp_14.CPP14Parser import CPP14Parser
+from ..cpp_14.CPP14Lexer import CPP14Lexer
 from antlr4 import InputStream, CommonTokenStream
 from antlr4.error.ErrorListener import ErrorListener
 
@@ -27,7 +27,7 @@ def ANTLR_parse(file_name, file_content, lang):
     Args:
         file_name: Name of the source file (used for error reporting).
         file_content: Source code as a string to be parsed.
-        lang: programming language of the source code (e.g. python, java, etc.).
+        lang: programming language of the source code (e.g. python_3_13, java_20, cpp_14, etc.).
 
     Returns:
         ANTLR parse tree representing the code's syntactic structure.
@@ -38,7 +38,7 @@ def ANTLR_parse(file_name, file_content, lang):
     input_stream = InputStream(file_content)
     error_listener = ExtendedErrorListener(file_name)
 
-    if lang == "python":
+    if lang == "python_3_13":
         # Lexing the input code to create a token stream
         lexer = PythonLexer(input_stream)
         lexer.removeErrorListeners()
@@ -49,7 +49,7 @@ def ANTLR_parse(file_name, file_content, lang):
         parser.removeErrorListeners()
         parser.addErrorListener(error_listener)
         tree = parser.file_input()
-    elif lang == "java":
+    elif lang == "java_20":
         # Lexing the input code to create a token stream
         lexer = Java20Lexer(input_stream)
         lexer.removeErrorListeners()
@@ -60,7 +60,7 @@ def ANTLR_parse(file_name, file_content, lang):
         parser.removeErrorListeners()
         parser.addErrorListener(error_listener)
         tree = parser.compilationUnit()
-    elif lang == "cpp":
+    elif lang == "cpp_14":
         # Lexing the input code to create a token stream
         lexer = CPP14Lexer(input_stream)
         lexer.removeErrorListeners()

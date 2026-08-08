@@ -1,7 +1,7 @@
 import hashlib
 from antlr4 import TerminalNode
 from ..Visitors import (
-    PythonParserVisitorExtended,
+    Python_3_13_ParserVisitorExtended,
     Java20ParserVisitorExtended,
     CPP14ParserVisitorExtended,
 )
@@ -23,11 +23,11 @@ def get_parser_visitor_class(lang):
         class: A ParserVisitor class that extends the appropriate base visitor for the given language.
     """
     base_visitor = None
-    if lang == "python":
-        base_visitor = PythonParserVisitorExtended
-    elif lang == "java":
+    if lang == "python_3_13":
+        base_visitor = Python_3_13_ParserVisitorExtended
+    elif lang == "java_20":
         base_visitor = Java20ParserVisitorExtended
-    elif lang == "cpp":
+    elif lang == "cpp_14":
         base_visitor = CPP14ParserVisitorExtended
 
     if base_visitor is None:

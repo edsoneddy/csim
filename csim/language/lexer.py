@@ -1,7 +1,7 @@
 import sys
-from ..python.PythonLexer import PythonLexer
-from ..java.Java20Lexer import Java20Lexer
-from ..cpp.CPP14Lexer import CPP14Lexer
+from ..python_3_13.PythonLexer import PythonLexer
+from ..java_20.Java20Lexer import Java20Lexer
+from ..cpp_14.CPP14Lexer import CPP14Lexer
 from antlr4 import InputStream, CommonTokenStream
 from antlr4.error.ErrorListener import ErrorListener
 
@@ -24,18 +24,18 @@ def ANTLR_tokenize(file_name, file_content, lang):
     Args:
         file_name: Name of the source file (used for error reporting).
         file_content: Source code as a string to be tokenized.
-        lang: programming language of the source code (e.g. python, java, etc.).
+        lang: programming language of the source code (e.g. python_3_13, java_20, cpp_14, etc.).
     Returns:
         List of token types extracted from the source code. 
     """
     input_stream = InputStream(file_content)
     error_listener = ExtendedErrorListener(file_name)
 
-    if lang == "python":
+    if lang == "python_3_13":
         lexer = PythonLexer(input_stream)
-    elif lang == "java":
+    elif lang == "java_20":
         lexer = Java20Lexer(input_stream)
-    elif lang == "cpp":
+    elif lang == "cpp_14":
         lexer = CPP14Lexer(input_stream)
     else:
         raise ValueError(f"Unsupported language: {lang}")

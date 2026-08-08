@@ -18,7 +18,7 @@ file_contents = [
 result = group_by_exhaustive_search(
     file_names,
     file_contents,
-    lang="python",
+    lang="python_3_13",
     threshold=0.67,
     ted_algorithm="zss",
     printable_output=False,

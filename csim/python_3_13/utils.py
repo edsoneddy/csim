@@ -119,7 +119,60 @@ HASHED_RULE_INDICES = {
 }
 CONTROL_EQUIVALENCE_RULE_INDICES = {}
 RULE_ASSIGNMENT = PythonParser.RULE_assignment
-ASIGN_OP_NORMALIZED = dict()
+ASIGN_OP_NORMALIZED = {
+    "+=": [
+        PythonParser.RULE_sum,
+        PythonLexer.PLUS + TOKEN_TYPE_OFFSET,
+    ],
+    "-=": [
+        PythonParser.RULE_sum,
+        PythonLexer.MINUS + TOKEN_TYPE_OFFSET,
+    ],
+    "*=": [
+        PythonParser.RULE_term,
+        PythonLexer.STAR + TOKEN_TYPE_OFFSET,
+    ],
+    "/=": [
+        PythonParser.RULE_term,
+        PythonLexer.SLASH + TOKEN_TYPE_OFFSET,
+    ],
+    "//=": [
+        PythonParser.RULE_term,
+        PythonLexer.DOUBLESLASH + TOKEN_TYPE_OFFSET,
+    ],
+    "%=": [
+        PythonParser.RULE_term,
+        PythonLexer.PERCENT + TOKEN_TYPE_OFFSET,
+    ],
+    "@=": [
+        PythonParser.RULE_term,
+        PythonLexer.AT + TOKEN_TYPE_OFFSET,
+    ],
+    "**=": [
+        PythonParser.RULE_power,
+        PythonLexer.DOUBLESTAR + TOKEN_TYPE_OFFSET,
+    ],
+    "<<=": [
+        PythonParser.RULE_shift_expr,
+        PythonLexer.LEFTSHIFT + TOKEN_TYPE_OFFSET,
+    ],
+    ">>=": [
+        PythonParser.RULE_shift_expr,
+        PythonLexer.RIGHTSHIFT + TOKEN_TYPE_OFFSET,
+    ],
+    "&=": [
+        PythonParser.RULE_bitwise_and,
+        PythonLexer.AMPER + TOKEN_TYPE_OFFSET,
+    ],
+    "^=": [
+        PythonParser.RULE_bitwise_xor,
+        PythonLexer.CIRCUMFLEX + TOKEN_TYPE_OFFSET,
+    ],
+    "|=": [
+        PythonParser.RULE_bitwise_or,
+        PythonLexer.VBAR + TOKEN_TYPE_OFFSET,
+    ],
+}
 EXCLUDED_RULE_TYPES = {
     PythonParser.RULE_name,
     PythonParser.RULE_name_except_underscore,

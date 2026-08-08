@@ -21,7 +21,7 @@ result = group_by_exhaustive_search(
     lang="python_3_13",
     threshold=0.67,
     ted_algorithm="apted",
-    printable_output=False,
+    printable_output=True,
 )
 
 print(result)

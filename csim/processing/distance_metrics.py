@@ -36,7 +36,7 @@ def label_distance(label1, label2):
     return 1.0
 
 
-def TreeEditDistance(N1, N2, ted_algorithm="zss"):
+def TreeEditDistance(N1, N2, ted_algorithm="apted"):
     """Calculate the tree edit distance between two trees using the specified algorithm.
     Args:
         N1: First tree (root node).

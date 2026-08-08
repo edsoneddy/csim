@@ -24,14 +24,14 @@ def main():
     Arguments for 'report' action:
         --path, -p (str): Path to a directory containing source code files (required).
         --lang, -l (str): The programming language of the source files (default: 'python_3_13').
-        --talg, -ta (str): The tree edit distance algorithm to use (default: 'zss').
+        --talg, -ta (str): The tree edit distance algorithm to use (default: 'apted').
 
     Arguments for 'group' action:
         --path, -p (str): Path to a directory containing source code files (required).
         --threshold, -t (float): Similarity threshold between 0.0 and 1.0 (required).
         --strategy, -s (str): Grouping strategy: 'exhaustive' (default).
         --lang, -l (str): The programming language of the source files (default: 'python_3_13').
-        --talg, -ta (str): The tree edit distance algorithm to use (default: 'zss').
+        --talg, -ta (str): The tree edit distance algorithm to use (default: 'apted').
 
     Arguments for 'tree'/'view' action:
         --path, -p (str): Path to a single source code file (required).
@@ -76,8 +76,8 @@ def main():
         "--talg",
         "-ta",
         choices=["zss", "apted"],
-        default="zss",
-        help="The tree edit distance algorithm to use (default: zss).",
+        default="apted",
+        help="The tree edit distance algorithm to use (default: apted).",
     )
 
     # Threshold (only for 'group' action)

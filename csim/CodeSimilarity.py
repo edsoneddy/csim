@@ -9,7 +9,7 @@ def Compare(
     name_b="Snippet B",
     content_b="",
     lang="python_3_13",
-    ted_algorithm="zss",
+    ted_algorithm="apted",
 ):
     """Compare two Python code snippets and compute their similarity.
 

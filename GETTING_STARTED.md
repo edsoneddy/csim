@@ -150,23 +150,23 @@ csim report --path ./cpp_files --lang cpp_14
 
 ### Change Tree Edit Distance Algorithm
 
-By default, csim uses the `zss` algorithm. You can switch to `apted`:
+By default, csim uses the `apted` algorithm. You can switch to `zss`:
 
 ```bash
-csim group --path ./files --threshold 0.8 --talg apted
+csim group --path ./files --threshold 0.8 --talg zss
 ```
 
-`apted` may be slower but is sometimes more accurate for certain code patterns.
+Both algorithms compute the same tree edit distance; `apted` is the default.
 
 ### Combine Options
 
 ```bash
-# Large Java 20 assignment dataset (exhaustive search with apted algorithm)
+# Large Java 20 assignment dataset (exhaustive search with zss algorithm)
 csim group --path ./java_submissions \
   --threshold 0.8 \
   --strategy exhaustive \
   --lang java_20 \
-  --talg apted
+  --talg zss
 ```
 
 ---
@@ -191,7 +191,7 @@ results = report_pairwise_similarity(
     file_names=file_names,
     file_contents=file_contents,
     lang="python_3_13",
-    ted_algorithm="zss"
+    ted_algorithm="apted"
 )
 
 print(results)

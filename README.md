@@ -19,8 +19,8 @@ Code Similarity (csim) provide a module designed to detect similarities between 
 
 - **Python:** The core programming language for the tool.
 - **ANTLR:** A parser generator for creating parse trees from source code.
-- **zss:** A library for calculating the tree edit distance.
-- **apted:** A library for computing the tree edit distance, alternatively to zss.
+- **apted:** A library for computing the tree edit distance (default algorithm).
+- **zss:** A library for calculating the tree edit distance, alternatively to apted.
 - **NumPy:** Used for efficient numerical operations.
 
 ## Installation
@@ -83,11 +83,11 @@ file2.py is similar to file3.py with similarity index: 0.50
 
 **Options:**
 - `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `cpp_14`
-- `--talg, -ta`: Tree edit distance algorithm (default: `zss`). Options: `zss`, `apted`
+- `--talg, -ta`: Tree edit distance algorithm (default: `apted`). Options: `zss`, `apted`
 
 **Example with options:**
 ```sh
-csim report --path /path/to/directory --lang java_20 --talg apted
+csim report --path /path/to/directory --lang java_20 --talg zss
 ```
 
 ### Action 2: `group` - Group Files by Similarity
@@ -129,11 +129,11 @@ csim group --path /path/to/directory --threshold 0.8 --strategy exhaustive
 - `--threshold, -t`: Similarity threshold (0.0 to 1.0). **Required.**
 - `--strategy, -s`: Grouping strategy (default: `exhaustive`). Options: `exhaustive`
 - `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `cpp_14`
-- `--talg, -ta`: Tree edit distance algorithm (default: `zss`). Options: `zss`, `apted`
+- `--talg, -ta`: Tree edit distance algorithm (default: `apted`). Options: `zss`, `apted`
 
 **Complete example:**
 ```sh
-csim group --path /path/to/directory --threshold 0.9 --strategy exhaustive --lang python_3_13 --talg apted
+csim group --path /path/to/directory --threshold 0.9 --strategy exhaustive --lang python_3_13 --talg zss
 ```
 
 ### Action 3: `tree` (alias: `view`) - Visualize Parse Trees
@@ -217,7 +217,7 @@ results = group_by_exhaustive_search(
     file_contents=file_contents,
     lang="python_3_13",
     threshold=0.8,
-    ted_algorithm="zss"
+    ted_algorithm="apted"
 )
 
 print(results)

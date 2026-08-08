@@ -20,7 +20,7 @@ result = group_by_exhaustive_search(
     file_contents,
     lang="python_3_13",
     threshold=0.67,
-    ted_algorithm="zss",
+    ted_algorithm="apted",
     printable_output=False,
 )
 

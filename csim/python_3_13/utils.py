@@ -59,6 +59,17 @@ EXCLUDED_TOKEN_TYPES = {
     PythonLexer.DEF,
     # DEL
     PythonLexer.DEL,
+    # Statement-introducing keywords whose parent rule already differs by
+    # rule label (else_block, except_block, class_def_raw, finally_block,
+    # function_def_raw w/ ASYNC), so the keyword token itself is redundant.
+    # csim-batch-tuner sweep, scripts/report.md -- verified collision-free
+    # in combination with every other entry added below (not just against
+    # the pristine baseline each was individually measured against).
+    PythonLexer.ELSE,
+    PythonLexer.EXCEPT,
+    PythonLexer.CLASS,
+    PythonLexer.FINALLY,
+    PythonLexer.ASYNC,
 }
 EXCLUDE_CHILDRENS_FROM_RULE = {
     PythonParser.RULE_for_stmt: [
@@ -116,6 +127,17 @@ HASHED_RULE_INDICES = {
     # del_targets / del_target
     PythonParser.RULE_del_targets,
     PythonParser.RULE_del_target,
+    # Body-wrapping rules: content-based hash preserves genuine differences
+    # between two classes/functions/branches while collapsing the noisy
+    # internal structure to a single node. csim-batch-tuner sweep,
+    # scripts/report.md, verified collision-free in combination.
+    PythonParser.RULE_class_def_raw,
+    PythonParser.RULE_function_def,
+    PythonParser.RULE_function_def_raw,
+    PythonParser.RULE_if_stmt,
+    PythonParser.RULE_while_stmt,
+    PythonParser.RULE_for_stmt,
+    PythonParser.RULE_with_stmt,
 }
 CONTROL_EQUIVALENCE_RULE_INDICES = {}
 RULE_ASSIGNMENT = PythonParser.RULE_assignment
@@ -203,4 +225,21 @@ EXCLUDED_RULE_TYPES = {
     # Assignment/targets.
     PythonParser.RULE_star_target,
     PythonParser.RULE_t_primary,
+    # csim-batch-tuner sweep (scripts/report.md), verified collision-free
+    # in combination. NOTE: `block` and `params` were ALSO recommended by
+    # the sweep but deliberately left OUT here -- applying `block`
+    # together with the hashed body-wrapping rules above erases a
+    # function/class/branch's entire content before it reaches the hash
+    # (every function collapsed to the same sha256("") digest, a genuine
+    # collision, not just a theoretical risk). `params` similarly
+    # collided when combined with the rest. See the audit method note at
+    # the end of this file.
+    PythonParser.RULE_default_assignment,
+    PythonParser.RULE_elif_stmt,
+    PythonParser.RULE_else_block,
+    PythonParser.RULE_with_item,
+    PythonParser.RULE_try_stmt,
+    PythonParser.RULE_except_block,
+    PythonParser.RULE_except_star_block,
+    PythonParser.RULE_finally_block,
 }

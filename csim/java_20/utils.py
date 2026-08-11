@@ -65,6 +65,27 @@ EXCLUDED_TOKEN_TYPES = {
     Java20Lexer.LT,
     Java20Lexer.INC,
     Java20Lexer.DEC,
+    # csim-batch-tuner sweep (scripts/report.md): each keyword/operator is
+    # redundant once its parent rule already carries a distinct label
+    # (module directives, yield/assert/finally/for/this statements, and
+    # punctuation whose surrounding rule shape already differs). Verified
+    # collision-free in combination with every other entry added below.
+    Java20Lexer.EXPORTS,
+    Java20Lexer.MODULE,
+    Java20Lexer.OPEN,
+    Java20Lexer.OPENS,
+    Java20Lexer.PROVIDES,
+    Java20Lexer.REQUIRES,
+    Java20Lexer.TO,
+    Java20Lexer.WITH,
+    Java20Lexer.YIELD,
+    Java20Lexer.ASSERT,
+    Java20Lexer.FINALLY,
+    Java20Lexer.FOR,
+    Java20Lexer.THIS,
+    Java20Lexer.ELLIPSIS,
+    Java20Lexer.BANG,
+    Java20Lexer.TILDE,
 }
 EXCLUDE_CHILDRENS_FROM_RULE = dict()
 COLLAPSED_RULE_INDICES = {
@@ -93,6 +114,30 @@ HASHED_RULE_INDICES = {
     Java20Parser.RULE_fieldDeclaration,
     Java20Parser.RULE_variableDeclarator,
     Java20Parser.RULE_localVariableDeclaration,
+    # Body-wrapping rules: content-based hash preserves genuine differences
+    # while collapsing internal structure to a single node.
+    # csim-batch-tuner sweep, scripts/report.md, verified collision-free
+    # in combination.
+    Java20Parser.RULE_ordinaryCompilationUnit,
+    Java20Parser.RULE_moduleDeclaration,
+    Java20Parser.RULE_classBody,
+    Java20Parser.RULE_methodDeclaration,
+    Java20Parser.RULE_exceptionTypeList,
+    Java20Parser.RULE_constructorDeclaration,
+    Java20Parser.RULE_enumBody,
+    Java20Parser.RULE_enumBodyDeclarations,
+    Java20Parser.RULE_recordDeclaration,
+    Java20Parser.RULE_normalInterfaceDeclaration,
+    Java20Parser.RULE_interfaceMethodDeclaration,
+    Java20Parser.RULE_annotationInterfaceBody,
+    Java20Parser.RULE_assertStatement,
+    Java20Parser.RULE_whileStatement,
+    Java20Parser.RULE_synchronizedStatement,
+    Java20Parser.RULE_tryWithResourcesStatement,
+    Java20Parser.RULE_resourceList,
+    Java20Parser.RULE_unaryExpression,
+    Java20Parser.RULE_conditionalExpression,
+    Java20Parser.RULE_switchExpression,
 }
 
 CONTROL_EQUIVALENCE_RULE_INDICES = set()
@@ -135,4 +180,54 @@ EXCLUDED_RULE_TYPES = {
     Java20Parser.RULE_forInit,
     Java20Parser.RULE_forUpdate,
     Java20Parser.RULE_statementExpressionList,
+    # csim-batch-tuner sweep (scripts/report.md), verified collision-free
+    # in combination with every other entry in this file. NOTE:
+    # topLevelClassOrInterfaceDeclaration was DELIBERATELY EXCLUDED:
+    # confirmed it drops entire class/interface bodies from every
+    # compilation unit (only package/import lines survive). Also dropped
+    # for causing collisions when combined with the rest of this set:
+    # moduleDirective, methodHeader, methodDeclarator, formalParameterList,
+    # formalParameter, staticInitializer, ifThenElseStatement, switchRule,
+    # enhancedForStatement, tryStatement, catches,
+    # unaryExpressionNotPlusMinus. See the audit method note at the end of
+    # this file.
+    Java20Parser.RULE_moduleName,
+    Java20Parser.RULE_classImplements,
+    Java20Parser.RULE_interfaceTypeList,
+    Java20Parser.RULE_receiverParameter,
+    Java20Parser.RULE_variableArityParameter,
+    Java20Parser.RULE_variableModifier,
+    Java20Parser.RULE_throwsT,
+    Java20Parser.RULE_instanceInitializer,
+    Java20Parser.RULE_constructorDeclarator,
+    Java20Parser.RULE_explicitConstructorInvocation,
+    Java20Parser.RULE_enumConstantList,
+    Java20Parser.RULE_enumConstant,
+    Java20Parser.RULE_recordHeader,
+    Java20Parser.RULE_recordComponentList,
+    Java20Parser.RULE_recordComponent,
+    Java20Parser.RULE_interfacePermits,
+    Java20Parser.RULE_constantDeclaration,
+    Java20Parser.RULE_interfaceMethodModifier,
+    Java20Parser.RULE_defaultValue,
+    Java20Parser.RULE_statementNoShortIf,
+    Java20Parser.RULE_ifThenStatement,
+    Java20Parser.RULE_switchStatement,
+    Java20Parser.RULE_switchBlockStatementGroup,
+    Java20Parser.RULE_switchLabel,
+    Java20Parser.RULE_caseConstant,
+    Java20Parser.RULE_doStatement,
+    Java20Parser.RULE_basicForStatement,
+    Java20Parser.RULE_throwStatement,
+    Java20Parser.RULE_catchClause,
+    Java20Parser.RULE_catchFormalParameter,
+    Java20Parser.RULE_catchType,
+    Java20Parser.RULE_finallyBlock,
+    Java20Parser.RULE_resourceSpecification,
+    Java20Parser.RULE_yieldStatement,
+    Java20Parser.RULE_arrayAccess,
+    Java20Parser.RULE_preIncrementExpression,
+    Java20Parser.RULE_castExpression,
+    Java20Parser.RULE_assignment,
+    Java20Parser.RULE_leftHandSide,
 }

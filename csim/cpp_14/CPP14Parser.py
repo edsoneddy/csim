@@ -12618,18 +12618,18 @@ class CPP14Parser ( CPP14ParserBase ):
 
                 elif la_ == 2:
                     self.state = 1708
-                    if not  this.IsPureSpecifierAllowed() :
+                    if not  self.IsPureSpecifierAllowed() :
                         from antlr4.error.Errors import FailedPredicateException
-                        raise FailedPredicateException(self, " this.IsPureSpecifierAllowed() ")
+                        raise FailedPredicateException(self, " self.IsPureSpecifierAllowed() ")
                     self.state = 1709
                     self.pureSpecifier()
                     pass
 
                 elif la_ == 3:
                     self.state = 1710
-                    if not  this.IsPureSpecifierAllowed() :
+                    if not  self.IsPureSpecifierAllowed() :
                         from antlr4.error.Errors import FailedPredicateException
-                        raise FailedPredicateException(self, " this.IsPureSpecifierAllowed() ")
+                        raise FailedPredicateException(self, " self.IsPureSpecifierAllowed() ")
                     self.state = 1711
                     self.virtualSpecifierSeq()
                     self.state = 1712
@@ -15765,12 +15765,12 @@ class CPP14Parser ( CPP14ParserBase ):
 
     def memberDeclarator_sempred(self, localctx:MemberDeclaratorContext, predIndex:int):
             if predIndex == 7:
-                return  this.IsPureSpecifierAllowed() 
-         
+                return  self.IsPureSpecifierAllowed()
+
 
             if predIndex == 8:
-                return  this.IsPureSpecifierAllowed() 
-         
+                return  self.IsPureSpecifierAllowed()
+
 
 
 

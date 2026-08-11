@@ -817,8 +817,8 @@ memberDeclaratorList
 memberDeclarator
     : declarator (
         virtualSpecifierSeq
-        | { this.IsPureSpecifierAllowed() }? pureSpecifier
-        | { this.IsPureSpecifierAllowed() }? virtualSpecifierSeq pureSpecifier
+        | { self.IsPureSpecifierAllowed() }? pureSpecifier
+        | { self.IsPureSpecifierAllowed() }? virtualSpecifierSeq pureSpecifier
         | braceOrEqualInitializer
     )
     | declarator

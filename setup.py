@@ -49,7 +49,7 @@ except ImportError:
 
 setup(
     name="csim",
-    version="3.1.1",
+    version="3.2.0",
     packages=find_packages(),
     # Compiled native parsers, when built (scripts/build_native_parsers.sh).
     # Absent builds are fine: csim falls back to the pure-Python parsers.

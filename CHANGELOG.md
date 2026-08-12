@@ -3,7 +3,7 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
-## [Unreleased]
+## [3.2.0]
 
 ### New: Python 3 native parser (grammars-v4/python/python)
 

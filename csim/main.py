@@ -32,7 +32,7 @@ def print_backend_info():
 
     turned_off = _disabled()
 
-    for lang in ("python_3_13", "java_20", "java_24", "cpp_14"):
+    for lang in ("python_3_13", "python_3", "java_20", "java_24", "cpp_14"):
         if lang not in _NATIVE_CONFIG:
             print(f"  {lang:<14} python   (no native parser for this grammar)")
             continue
@@ -115,7 +115,7 @@ def main():
     parser.add_argument(
         "--lang",
         "-l",
-        choices=["python_3_13", "java_20", "java_24", "cpp_14"],
+        choices=["python_3_13", "python_3", "java_20", "java_24", "cpp_14"],
         default="python_3_13",
         help="The programming language of the source files (default: python_3_13).",
     )

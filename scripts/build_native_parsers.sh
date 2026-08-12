@@ -6,9 +6,10 @@
 # them together with csim's bridge, and installs the resulting shared library
 # into csim/native/lib/ where the loader looks for it.
 #
-# Supported languages: java_20, java_24 (grammars-v4/java/java), cpp_14.
-# Python uses the pure-Python parser (no C++ target for python_3_13, and legacy
-# python3 C++ target is slower on small CLI files).
+# Supported languages: java_20, java_24 (grammars-v4/java/java), cpp_14,
+# python_3 (grammars-v4/python/python, the "universal Python 2/3" grammar).
+# python_3_13 (the modern grammar) has no C++ target upstream and keeps using
+# the pure-Python parser; python_3 is a separate, additional language key.
 #
 # Requirements:
 #   - antlr4 (the generator) on PATH
@@ -26,7 +27,7 @@ BRIDGE_DIR="$REPO_ROOT/csim/native/src"
 LIB_DIR="$REPO_ROOT/csim/native/lib"
 BUILD_DIR="$REPO_ROOT/build/native"
 
-LANGUAGES=("${@:-java_20 java_24 cpp_14}")
+LANGUAGES=("${@:-java_20 java_24 cpp_14 python_3}")
 read -r -a LANGUAGES <<< "${LANGUAGES[*]}"
 
 # --- toolchain discovery ----------------------------------------------------
@@ -141,13 +142,22 @@ build_language() {
     (cd "$work" && $ANTLR "$parser_g4" -Dlanguage=Cpp -Xexact-output-dir -no-visitor -no-listener -o .)
     echo "  generated C++ lexer/parser"
 
-    # Ensure ParserBase.h is included in generated Parser.h (ANTLR doesn't do this automatically)
+    # Ensure ParserBase.h/LexerBase.h are included in the generated .h files
+    # (ANTLR doesn't do this automatically for every grammar).
     local parser_base_name="${parser_g4%.g4}Base"  # e.g. Java24ParserBase from Java24Parser.g4
     if [ -f "$work/${parser_base_name}.h" ]; then
         local parser_h="${parser_g4%.g4}.h"
         if ! grep -q "#include \"${parser_base_name}.h\"" "$work/$parser_h"; then
             sed -i '' "/#include \"antlr4-runtime.h\"/a\\
 #include \"${parser_base_name}.h\"" "$work/$parser_h"
+        fi
+    fi
+    local lexer_base_name="${lexer_g4%.g4}Base"
+    if [ -f "$work/${lexer_base_name}.h" ]; then
+        local lexer_h="${lexer_g4%.g4}.h"
+        if ! grep -q "#include \"${lexer_base_name}.h\"" "$work/$lexer_h"; then
+            sed -i '' "/#include \"antlr4-runtime.h\"/a\\
+#include \"${lexer_base_name}.h\"" "$work/$lexer_h"
         fi
     fi
 
@@ -198,6 +208,11 @@ for lang in "${LANGUAGES[@]}"; do
         cpp_14)
             build_language cpp_14 CPP14Lexer.g4 CPP14Parser.g4 \
                 "CPP14ParserBase.cpp CPP14ParserBase.h" libcpp14_fast
+            ;;
+        python_3)
+            build_language python_3 Python3Lexer.g4 Python3Parser.g4 \
+                "Python3LexerBase.cpp Python3LexerBase.h Python3ParserBase.cpp Python3ParserBase.h" \
+                libpython3_fast
             ;;
         *)
             echo "error: no native parser is defined for '$lang'" >&2

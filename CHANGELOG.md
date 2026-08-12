@@ -5,41 +5,95 @@ so they summarise each line rather than list every change.
 
 ## [Unreleased]
 
+### New: Python 3 native parser (grammars-v4/python/python)
+
+Added a native C++ parser for Python using grammars-v4's "universal Python
+2/3" grammar, available alongside the existing `python_3_13` parser (nothing
+about `python_3_13` was removed or changed). Unlike `java_24` below, grouping
+output has been tuned to match the pure-Python parser closely, not just
+parsing speed.
+
+**Performance** (`csim group` end-to-end, real files, `jv_dataset/all_py`):
+
+| Corpus | `python_3_13` | Native `python_3` | Speedup |
+|--------|---------------|--------------------|---------|
+| 67 files | 0.92s | 0.25s | 3.7x |
+| 296 files | 4.10s | 2.15s | 1.9x |
+
+Underlying parse-only speedup is 18.65x; the smaller end-to-end numbers
+reflect tree-edit-distance cost, which now dominates once parsing is fast
+(profiled: parsing is 91.6% of `python_3_13`'s runtime, 18% of `python_3`'s).
+
+**Grouping correctness:** validated by comparing `csim group`'s output against
+`python_3_13` pairwise, threshold 0.8, on multiple real corpora:
+
+| Corpus | Threshold-crossing pairs | Result |
+|--------|--------------------------|--------|
+| `all_py/1050` (67 files, 2211 pairs) | 0 | `csim group` output byte-identical |
+| `all_py/1006` (296 files) | 0 | `csim group` output byte-identical |
+| `all_py/1039` (91 files) | 26 | known limitation, see below |
+
+Three root causes were found and fixed via `csim/python_3/utils.py`'s
+`relabel_node()` hook (same engine-level technique introduced for `java_24`):
+import statements collapsed to a content-free marker (matching
+`python_3_13`), `try`/`except`/`finally` excluded entirely (matching
+`python_3_13`), and each `compound_stmt` alternative (`if`/`while`/`for`/
+`with`/`class`/`def`) given its own synthetic rule id so a control-flow-kind
+change costs full similarity distance instead of the partial credit a shared
+rule index would give.
+
+**Known limitation:** on files with very few top-level statements,
+`python_3`'s tree can end up smaller/coarser than `python_3_13`'s for the
+same source, which can slightly overstate similarity (a boilerplate match
+counts for proportionally more of a smaller tree). Root cause identified but
+not yet fixed — see `csim/python_3/utils.py`'s module docstring.
+
+**Coverage:** this grammar does not parse positional-only parameters (`/`,
+PEP 570), the walrus operator (`:=`, PEP 572), or `match`/`case` (PEP 634).
+`csim/native/loader.py` falls back to `python_3_13` automatically for files
+using those constructs, so results stay correct, just slower for that subset
+(measured: ~4.2% of a large real corpus).
+
+---
+
 ### Experimental: Java 24 native parser (grammars-v4/java/java)
 
 Added a native C++ parser for Java using the optimized Java 24 grammar from
 grammars-v4, available alongside the existing `java_20` parser (nothing about
-`java_20` was removed or changed). Parsing itself is dramatically faster and
-verified correct; **grouping/similarity output is not yet usable** — see below.
+`java_20` was removed or changed).
 
-**Performance** (`csim group` end-to-end, 50 real files, 3 trials each):
+**Performance** (`csim group` end-to-end, 50 real files):
 
 | Configuration | Time |
 |----------------|------|
-| Pure Python | 68.17s |
-| Native `java_20` | 11.43s avg |
-| Native `java_24` | 0.26s avg |
+| Pure Python | 68.93s |
+| Native `java_20` | 10.93s avg |
+| Native `java_24` | 0.38s avg |
 
-`java_24` is **~44x faster** than native `java_20`, and **~262x faster** than
+`java_24` is **~29x faster** than native `java_20`, and **~181x faster** than
 pure Python, on this corpus.
 
-**Known limitation — grouping correctness:** `csim/java_24/utils.py` (the
-rule-normalization tables that drive `Normalize`/`PruneAndHash`) is a rough,
-untuned port of `java_20`'s tables. On real submissions it produces
-significantly different — and less accurate — similarity scores than
-`java_20`: on a 50-file corpus where `java_20` correctly finds 3 groups of
-near-duplicate files, `java_24` finds 0. Pairwise similarity for structurally
-identical files (renamed variables only) can drop from 1.0 to 0.5. **Do not
-use `java_24` for `group`/`report` until this is fixed** — proper tuning
-requires the same kind of dedicated sweep that produced `java_20`'s tables
-(referenced in its comments as the "csim-batch-tuner sweep").
+**Known limitation — grouping correctness:** `csim/java_24/utils.py`'s
+rule-normalization tables are a partial port of `java_20`'s, extended with a
+`relabel_node()` engine hook (isolating assignment expressions from
+`java_24`'s unified `expression` rule) that fixed *recall* -- known
+near-duplicate pairs now correctly score 0.94-1.0 (were 0.5, undetected)
+across all 38 verified true-positive pairs in a 50-file corpus. *Precision*
+remains unfixed: on the same corpus, 532 of 570 pairs scoring above the 0.8
+threshold are false positives (unrelated files sharing enough boilerplate to
+look similar), because the shared-boilerplate-heavy submissions used to
+verify this haven't had the broader rule-table tuning `java_20` has (~65
+tuned exclusion entries, built via a dedicated corpus-tuner sweep referenced
+in `java_20/utils.py`'s comments). **Do not use `java_24` for `group`/`report`
+until this is fixed.**
 
 **Usage**:
 - `java_20` (existing, unchanged): use for `group`/`report` — correctness verified
 - `java_24` (new, experimental): parsing/raw-tree correctness verified; grouping
-  correctness pending rule-table tuning
-- `csim info` reports native parser availability for both
-- `CSIM_DISABLE_NATIVE=1` forces pure-Python parser for both
+  precision (false-positive rate) pending further rule-table tuning
+- `python_3` (new): both parsing speed and grouping correctness verified — see above
+- `csim info` reports native parser availability for all four languages
+- `CSIM_DISABLE_NATIVE=1` forces pure-Python parsers for all
 
 ---
 

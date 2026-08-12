@@ -127,12 +127,21 @@ The `--threshold` parameter determines how similar files must be to be considere
 
 ## Supported Languages
 
-csim supports four programming language configurations:
+csim supports five programming language configurations:
 
 ### Python 3.13
 ```bash
 csim report --path ./python_files --lang python_3_13
 ```
+
+### Python 3 (universal grammar, faster)
+```bash
+csim report --path ./python_files --lang python_3
+```
+Same `.py` files as `python_3_13`, parsed with a grammar that has a native C++
+target (see `csim info`). Grouping output matches `python_3_13` on real code;
+does not parse positional-only params (`/`), walrus (`:=`), or `match`/`case` --
+csim falls back to `python_3_13` automatically for those files.
 
 ### Java 20
 ```bash

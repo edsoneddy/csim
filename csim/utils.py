@@ -31,6 +31,9 @@ def get_rule_names(lang):
     elif lang == "cpp_14":
         from .cpp_14.CPP14Parser import CPP14Parser
         return CPP14Parser.ruleNames
+    elif lang == "python_3":
+        from .python_3.Python3Parser import Python3Parser
+        return Python3Parser.ruleNames
     else:
         return None
 
@@ -56,6 +59,9 @@ def get_symbolic_names(lang):
     elif lang == "cpp_14":
         from .cpp_14.CPP14Lexer import CPP14Lexer
         return CPP14Lexer.symbolicNames
+    elif lang == "python_3":
+        from .python_3.Python3Lexer import Python3Lexer
+        return Python3Lexer.symbolicNames
     else:
         return None
 
@@ -170,6 +176,8 @@ def get_extension_by_lang(lang):
         return ".java"
     elif lang == "cpp_14":
         return ".cpp"
+    elif lang == "python_3":
+        return ".py"
     else:
         raise ValueError(f"Unsupported language: {lang}")
 
@@ -221,6 +229,10 @@ def get_excluded_token_types(lang):
         from .cpp_14.utils import EXCLUDED_TOKEN_TYPES as cpp_14_excluded
 
         return cpp_14_excluded
+    elif lang == "python_3":
+        from .python_3.utils import EXCLUDED_TOKEN_TYPES as python_3_excluded
+
+        return python_3_excluded
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -249,6 +261,10 @@ def get_excluded_rule_types(lang):
         from .cpp_14.utils import EXCLUDED_RULE_TYPES as cpp_14_excluded
 
         return cpp_14_excluded
+    elif lang == "python_3":
+        from .python_3.utils import EXCLUDED_RULE_TYPES as python_3_excluded
+
+        return python_3_excluded
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -271,6 +287,9 @@ def get_hash_rule_indices(lang):
     if lang == "cpp_14":
         from .cpp_14.utils import HASHED_RULE_INDICES as cpp_14_hashed_rules
         return cpp_14_hashed_rules
+    if lang == "python_3":
+        from .python_3.utils import HASHED_RULE_INDICES as python_3_hashed_rules
+        return python_3_hashed_rules
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -294,10 +313,13 @@ def get_relabel_fn(lang):
 
     Returns:
         callable(node) -> Optional[int], or None if this language needs no
-            relabeling (the default for every language but java_24).
+            relabeling (the default for most languages).
     """
     if lang == "java_24":
         from .java_24.utils import relabel_node
+        return relabel_node
+    if lang == "python_3":
+        from .python_3.utils import relabel_node
         return relabel_node
     return None
 
@@ -331,6 +353,11 @@ def get_exclude_childrens_from_rule(lang):
             EXCLUDE_CHILDRENS_FROM_RULE as cpp_14_exclude_childrens_from_rule,
         )
         return cpp_14_exclude_childrens_from_rule
+    if lang == "python_3":
+        from .python_3.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as python_3_exclude_childrens_from_rule,
+        )
+        return python_3_exclude_childrens_from_rule
     else:
         return dict()  # Default to empty dict for unsupported languages
 
@@ -364,6 +391,11 @@ def get_control_equivalence_rule_indices(lang):
             CONTROL_EQUIVALENCE_RULE_INDICES as cpp_14_control_equivalence_rules,
         )
         return cpp_14_control_equivalence_rules
+    if lang == "python_3":
+        from .python_3.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as python_3_control_equivalence_rules,
+        )
+        return python_3_control_equivalence_rules
     else:
         return dict()  # Default to empty dict for unsupported languages
 

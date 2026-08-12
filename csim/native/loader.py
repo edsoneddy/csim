@@ -15,10 +15,11 @@ _NATIVE_CONFIG = {
     "java_20": ("libjava20_fast", "parse_java_flat"),
     "java_24": ("libjava24_fast", "parse_java24_flat"),
     "cpp_14": ("libcpp14_fast", "parse_cpp_flat"),
+    "python_3": ("libpython3_fast", "parse_python3_flat"),
     # python_3_13 is intentionally absent: the modern Python grammar csim uses
-    # publishes no C++ target (no PythonLexerBase.cpp/.h upstream), and the
-    # legacy python3 grammar is slower than the Python runtime on CLI due to
-    # cold-start overhead (only viable for long-running services).
+    # publishes no C++ target upstream. python_3 (grammars-v4/python/python,
+    # the "universal Python 2/3" grammar) is a separate, additional language
+    # with its own native parser -- python_3_13 is unaffected and unchanged.
 }
 
 _LIB_DIR = Path(__file__).parent / "lib"
@@ -146,4 +147,8 @@ def _literal_names(lang):
         from ..python_3_13.PythonLexer import PythonLexer
 
         return PythonLexer.literalNames
+    if lang == "python_3":
+        from ..python_3.Python3Lexer import Python3Lexer
+
+        return Python3Lexer.literalNames
     return None

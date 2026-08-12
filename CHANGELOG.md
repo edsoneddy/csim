@@ -3,6 +3,21 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+## [3.1.1]
+
+Packaging fix. No changes to csim itself.
+
+The 3.1.0 macOS wheel went out tagged `universal2`, claiming support for both
+Intel and Apple Silicon, while carrying arm64-only libraries. On an Intel Mac
+pip would install it, the libraries would fail to load, and csim would fall
+back to the Python parser: correct results, no speedup. The wheel is now
+tagged `arm64`, and the build checks each library's architecture against the
+tag before packaging.
+
+Linux and Apple Silicon users are unaffected by the bug and by the fix.
+
+---
+
 ## [3.1.0]
 
 Native C++ parsers for Java and C++, giving a **6-8x speedup** on `csim group`

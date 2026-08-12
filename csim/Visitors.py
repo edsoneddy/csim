@@ -1,5 +1,6 @@
 from .python_3_13.PythonParserVisitor import PythonParserVisitor
 from .java_20.Java20ParserVisitor import Java20ParserVisitor
+from .java_24.Java24ParserVisitor import Java24ParserVisitor
 from .cpp_14.CPP14ParserVisitor import CPP14ParserVisitor
 from antlr4 import TerminalNode
 from .java_20.utils import (
@@ -7,6 +8,17 @@ from .java_20.utils import (
     ASIGN_OP_NORMALIZED as JAVA_20_ASSIGN_OP_NORMALIZED,
     RULE_ASSIGNMENT as JAVA_20_RULE_ASSIGNMENT,
 )
+try:
+    from .java_24.utils import (
+        COLLAPSED_RULE_INDICES as JAVA_24_COLLAPSED_RULES,
+        ASIGN_OP_NORMALIZED as JAVA_24_ASSIGN_OP_NORMALIZED,
+        RULE_ASSIGNMENT as JAVA_24_RULE_ASSIGNMENT,
+    )
+except (ImportError, AttributeError):
+    # java_24 utils may not be fully available yet
+    JAVA_24_COLLAPSED_RULES = set()
+    JAVA_24_ASSIGN_OP_NORMALIZED = dict()
+    JAVA_24_RULE_ASSIGNMENT = None
 from .python_3_13.utils import (
     COLLAPSED_RULE_INDICES as PYTHON_3_13_COLLAPSED_RULES,
     ASIGN_OP_NORMALIZED as PYTHON_3_13_ASSIGN_OP_NORMALIZED,
@@ -76,6 +88,40 @@ class Java20ParserVisitorExtended(Java20ParserVisitor):
             # Rewrite the assignment to a normalized form based on the operator
             rule, operator_token = JAVA_20_ASSIGN_OP_NORMALIZED[operand]
             assignment_node = {"label": JAVA_20_RULE_ASSIGNMENT, "children": []}
+            norm_node = {"label": rule, "children": []}
+            norm_node["children"].append(self.visit(node.getChild(0)))
+            norm_node["children"].append({"label": operator_token, "children": []})
+            norm_node["children"].append(self.visit(node.getChild(2)))
+            assignment_node["children"].append(norm_node)
+            return assignment_node
+        else:
+            # For regular assignment, just visit the children as usual
+            return self.visitChildren(node)
+
+
+class Java24ParserVisitorExtended(Java24ParserVisitor):
+    def visit(self, tree):
+        """Override visit to exclude certain rules from being processed.
+        This helps in reducing noise in the parse tree by skipping over
+        less relevant constructs.
+        """
+        if (
+            not isinstance(tree, TerminalNode)
+            and tree.getRuleIndex() in JAVA_24_COLLAPSED_RULES
+        ):
+            return {"label": tree.getRuleIndex(), "children": []}
+        return tree.accept(self)
+
+    def visitAssignment(self, node):
+        """Rewrite assignment nodes to a normalized form based on the operator used.
+        This allows different forms of the same underlying operation to be treated as equivalent in similarity comparisons.
+        e.g., "x += 1" and "x = x + 1" would both be normalized to a common representation, improving the accuracy of similarity detection.
+        """
+        operand = node.getChild(1).getText()
+        if operand in JAVA_24_ASSIGN_OP_NORMALIZED:
+            # Rewrite the assignment to a normalized form based on the operator
+            rule, operator_token = JAVA_24_ASSIGN_OP_NORMALIZED[operand]
+            assignment_node = {"label": JAVA_24_RULE_ASSIGNMENT, "children": []}
             norm_node = {"label": rule, "children": []}
             norm_node["children"].append(self.visit(node.getChild(0)))
             norm_node["children"].append({"label": operator_token, "children": []})

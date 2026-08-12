@@ -13,10 +13,12 @@ from pathlib import Path
 # Per-language native configuration: library basename and exported symbol.
 _NATIVE_CONFIG = {
     "java_20": ("libjava20_fast", "parse_java_flat"),
+    "java_24": ("libjava24_fast", "parse_java24_flat"),
     "cpp_14": ("libcpp14_fast", "parse_cpp_flat"),
     # python_3_13 is intentionally absent: the modern Python grammar csim uses
     # publishes no C++ target (no PythonLexerBase.cpp/.h upstream), and the
-    # legacy python3 grammar that does parses slower than the Python runtime.
+    # legacy python3 grammar is slower than the Python runtime on CLI due to
+    # cold-start overhead (only viable for long-running services).
 }
 
 _LIB_DIR = Path(__file__).parent / "lib"
@@ -132,6 +134,10 @@ def _literal_names(lang):
         from ..java_20.Java20Lexer import Java20Lexer
 
         return Java20Lexer.literalNames
+    if lang == "java_24":
+        from ..java_24.Java24Lexer import Java24Lexer
+
+        return Java24Lexer.literalNames
     if lang == "cpp_14":
         from ..cpp_14.CPP14Lexer import CPP14Lexer
 

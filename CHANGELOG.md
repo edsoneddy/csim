@@ -3,6 +3,46 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+## [Unreleased]
+
+### Experimental: Java 24 native parser (grammars-v4/java/java)
+
+Added a native C++ parser for Java using the optimized Java 24 grammar from
+grammars-v4, available alongside the existing `java_20` parser (nothing about
+`java_20` was removed or changed). Parsing itself is dramatically faster and
+verified correct; **grouping/similarity output is not yet usable** — see below.
+
+**Performance** (`csim group` end-to-end, 50 real files, 3 trials each):
+
+| Configuration | Time |
+|----------------|------|
+| Pure Python | 68.17s |
+| Native `java_20` | 11.43s avg |
+| Native `java_24` | 0.26s avg |
+
+`java_24` is **~44x faster** than native `java_20`, and **~262x faster** than
+pure Python, on this corpus.
+
+**Known limitation — grouping correctness:** `csim/java_24/utils.py` (the
+rule-normalization tables that drive `Normalize`/`PruneAndHash`) is a rough,
+untuned port of `java_20`'s tables. On real submissions it produces
+significantly different — and less accurate — similarity scores than
+`java_20`: on a 50-file corpus where `java_20` correctly finds 3 groups of
+near-duplicate files, `java_24` finds 0. Pairwise similarity for structurally
+identical files (renamed variables only) can drop from 1.0 to 0.5. **Do not
+use `java_24` for `group`/`report` until this is fixed** — proper tuning
+requires the same kind of dedicated sweep that produced `java_20`'s tables
+(referenced in its comments as the "csim-batch-tuner sweep").
+
+**Usage**:
+- `java_20` (existing, unchanged): use for `group`/`report` — correctness verified
+- `java_24` (new, experimental): parsing/raw-tree correctness verified; grouping
+  correctness pending rule-table tuning
+- `csim info` reports native parser availability for both
+- `CSIM_DISABLE_NATIVE=1` forces pure-Python parser for both
+
+---
+
 ## [3.1.1]
 
 Packaging fix. No changes to csim itself.

@@ -25,6 +25,9 @@ def get_rule_names(lang):
     elif lang == "java_20":
         from .java_20.Java20Parser import Java20Parser
         return Java20Parser.ruleNames
+    elif lang == "java_24":
+        from .java_24.Java24Parser import Java24Parser
+        return Java24Parser.ruleNames
     elif lang == "cpp_14":
         from .cpp_14.CPP14Parser import CPP14Parser
         return CPP14Parser.ruleNames
@@ -47,6 +50,9 @@ def get_symbolic_names(lang):
     elif lang == "java_20":
         from .java_20.Java20Lexer import Java20Lexer
         return Java20Lexer.symbolicNames
+    elif lang == "java_24":
+        from .java_24.Java24Lexer import Java24Lexer
+        return Java24Lexer.symbolicNames
     elif lang == "cpp_14":
         from .cpp_14.CPP14Lexer import CPP14Lexer
         return CPP14Lexer.symbolicNames
@@ -160,6 +166,8 @@ def get_extension_by_lang(lang):
         return ".py"
     elif lang == "java_20":
         return ".java"
+    elif lang == "java_24":
+        return ".java"
     elif lang == "cpp_14":
         return ".cpp"
     else:
@@ -205,6 +213,10 @@ def get_excluded_token_types(lang):
         from .java_20.utils import EXCLUDED_TOKEN_TYPES as java_20_excluded
 
         return java_20_excluded
+    elif lang == "java_24":
+        from .java_24.utils import EXCLUDED_TOKEN_TYPES as java_24_excluded
+
+        return java_24_excluded
     elif lang == "cpp_14":
         from .cpp_14.utils import EXCLUDED_TOKEN_TYPES as cpp_14_excluded
 
@@ -229,6 +241,10 @@ def get_excluded_rule_types(lang):
         from .java_20.utils import EXCLUDED_RULE_TYPES as java_20_excluded
 
         return java_20_excluded
+    elif lang == "java_24":
+        from .java_24.utils import EXCLUDED_RULE_TYPES as java_24_excluded
+
+        return java_24_excluded
     elif lang == "cpp_14":
         from .cpp_14.utils import EXCLUDED_RULE_TYPES as cpp_14_excluded
 
@@ -249,11 +265,41 @@ def get_hash_rule_indices(lang):
     if lang == "java_20":
         from .java_20.utils import HASHED_RULE_INDICES as java_20_hashed_rules
         return java_20_hashed_rules
+    if lang == "java_24":
+        from .java_24.utils import HASHED_RULE_INDICES as java_24_hashed_rules
+        return java_24_hashed_rules
     if lang == "cpp_14":
         from .cpp_14.utils import HASHED_RULE_INDICES as cpp_14_hashed_rules
         return cpp_14_hashed_rules
     else:
         return set()  # Default to empty set for unsupported languages
+
+
+def get_relabel_fn(lang):
+    """Retrieve a language-specific node relabeling hook, if any.
+
+    Some grammars fold constructs that another language's grammar keeps as
+    separate rules into one unified rule with ANTLR labeled alternatives
+    (e.g. java_24's `expression` covers binary operators, assignments, casts,
+    etc. under a single rule index) -- EXCLUDED_RULE_TYPES/HASHED_RULE_INDICES
+    can't target just one of those alternatives by rule index alone. This
+    hook lets a language's utils.py inspect a node's actual children (e.g.
+    the specific operator token) and return a synthetic rule id to use
+    instead of the real one, before the rest of Normalize's classification
+    runs -- see csim/java_24/utils.py's relabel_node() for the concrete case
+    this exists for.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        callable(node) -> Optional[int], or None if this language needs no
+            relabeling (the default for every language but java_24).
+    """
+    if lang == "java_24":
+        from .java_24.utils import relabel_node
+        return relabel_node
+    return None
 
 
 def get_exclude_childrens_from_rule(lang):
@@ -275,6 +321,11 @@ def get_exclude_childrens_from_rule(lang):
             EXCLUDE_CHILDRENS_FROM_RULE as java_20_exclude_childrens_from_rule,
         )
         return java_20_exclude_childrens_from_rule
+    if lang == "java_24":
+        from .java_24.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as java_24_exclude_childrens_from_rule,
+        )
+        return java_24_exclude_childrens_from_rule
     if lang == "cpp_14":
         from .cpp_14.utils import (
             EXCLUDE_CHILDRENS_FROM_RULE as cpp_14_exclude_childrens_from_rule,
@@ -303,6 +354,11 @@ def get_control_equivalence_rule_indices(lang):
             CONTROL_EQUIVALENCE_RULE_INDICES as java_20_control_equivalence_rules,
         )
         return java_20_control_equivalence_rules
+    if lang == "java_24":
+        from .java_24.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as java_24_control_equivalence_rules,
+        )
+        return java_24_control_equivalence_rules
     if lang == "cpp_14":
         from .cpp_14.utils import (
             CONTROL_EQUIVALENCE_RULE_INDICES as cpp_14_control_equivalence_rules,

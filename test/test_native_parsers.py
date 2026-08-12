@@ -15,7 +15,7 @@ from csim.processing.tree_processing import Normalize, PruneAndHash
 from csim.utils import group_by_exhaustive_search, report_pairwise_similarity
 
 
-NATIVE_LANGS = ["java_20", "cpp_14"]
+NATIVE_LANGS = ["java_20", "java_24", "cpp_14"]
 
 
 JAVA_SAMPLES = {
@@ -62,7 +62,7 @@ CPP_SAMPLES = {
     ),
 }
 
-SAMPLES_BY_LANG = {"java_20": JAVA_SAMPLES, "cpp_14": CPP_SAMPLES}
+SAMPLES_BY_LANG = {"java_20": JAVA_SAMPLES, "java_24": JAVA_SAMPLES, "cpp_14": CPP_SAMPLES}
 
 
 def _parse_python_only(file_name, content, lang):
@@ -97,13 +97,24 @@ def _parse_native_only(file_name, content, lang):
     return tree
 
 
-def _flatten(node):
+def _flatten(node, relabel_fn=None):
     """Flatten a parse tree to (kind, label, child_count) triples in preorder.
 
     The node kind is recorded explicitly rather than folded into the label:
     an earlier encoding added a fixed offset to token types, which made EOF
     (token type -1) indistinguishable from a rule index and let a real
     terminal-vs-rule mismatch slip through this comparison.
+
+    relabel_fn, when given (java_24 only -- see csim.utils.get_relabel_fn),
+    is applied to every rule node's label. The native bridge bakes its
+    relabeling in at parse time (csim/native/src/java_24_bridge.cpp), while
+    the pure-Python path only applies it later, in Normalize() -- so a RAW
+    tree comparison needs this to compare like with like; without it, an
+    assignment-shaped `expression` node native already reports as the
+    synthetic id would be compared against the Python side's un-relabeled
+    real rule index and fail, even though both sides agree once Normalize()
+    runs (see test_normalized_tree_matches_python, the invariant that
+    actually matters).
     """
     from antlr4.tree.Tree import TerminalNode
 
@@ -115,7 +126,10 @@ def _flatten(node):
             out.append(("terminal", token.type if token else None, 0))
             return
         children = list(n.getChildren())
-        out.append(("rule", n.getRuleIndex(), len(children)))
+        label = n.getRuleIndex()
+        if relabel_fn is not None:
+            label = relabel_fn(n) or label
+        out.append(("rule", label, len(children)))
         for child in children:
             walk(child)
 
@@ -147,9 +161,12 @@ def test_native_library_is_available(lang):
 @pytest.mark.parametrize("lang", NATIVE_LANGS)
 def test_raw_tree_matches_python(lang):
     """The native raw parse tree must be structurally identical to Python's."""
+    from csim.utils import get_relabel_fn
+
+    relabel_fn = get_relabel_fn(lang)
     for name, code in SAMPLES_BY_LANG[lang].items():
-        native = _flatten(_parse_native_only("t", code, lang))
-        python = _flatten(_parse_python_only("t", code, lang))
+        native = _flatten(_parse_native_only("t", code, lang), relabel_fn)
+        python = _flatten(_parse_python_only("t", code, lang), relabel_fn)
         assert native == python, f"{lang}/{name}: raw tree differs"
 
 

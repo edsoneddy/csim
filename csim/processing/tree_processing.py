@@ -3,6 +3,7 @@ from antlr4 import TerminalNode
 from ..Visitors import (
     Python_3_13_ParserVisitorExtended,
     Java20ParserVisitorExtended,
+    Java24ParserVisitorExtended,
     CPP14ParserVisitorExtended,
 )
 from ..utils import (
@@ -12,6 +13,7 @@ from ..utils import (
     get_excluded_token_types,
     get_hash_rule_indices,
     get_excluded_rule_types,
+    get_relabel_fn,
 )
 
 
@@ -27,11 +29,15 @@ def get_parser_visitor_class(lang):
         base_visitor = Python_3_13_ParserVisitorExtended
     elif lang == "java_20":
         base_visitor = Java20ParserVisitorExtended
+    elif lang == "java_24":
+        base_visitor = Java24ParserVisitorExtended
     elif lang == "cpp_14":
         base_visitor = CPP14ParserVisitorExtended
 
     if base_visitor is None:
         raise ValueError(f"Unsupported language: {lang}")
+
+    relabel_fn = get_relabel_fn(lang)
 
     class ParserVisitor(base_visitor):
         """Custom visitor class that extends the base visitor for the specified language.
@@ -53,6 +59,8 @@ def get_parser_visitor_class(lang):
                 A dictionary representing the normalized subtree.
             """
             rule_index = node.getRuleIndex()
+            if relabel_fn is not None:
+                rule_index = relabel_fn(node) or rule_index
             children_nodes = []
 
             for child in node.getChildren():
@@ -65,10 +73,14 @@ def get_parser_visitor_class(lang):
                                 "children": [],
                             }
                         )
-                elif child.getRuleIndex() not in self.excluded_rule_types:
-                    result = self.visit(child)
-                    if result is not None:
-                        children_nodes.append(result)
+                else:
+                    child_rule_index = child.getRuleIndex()
+                    if relabel_fn is not None:
+                        child_rule_index = relabel_fn(child) or child_rule_index
+                    if child_rule_index not in self.excluded_rule_types:
+                        result = self.visit(child)
+                        if result is not None:
+                            children_nodes.append(result)
 
             if not children_nodes:
                 return {"label": rule_index, "children": []}

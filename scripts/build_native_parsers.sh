@@ -6,9 +6,9 @@
 # them together with csim's bridge, and installs the resulting shared library
 # into csim/native/lib/ where the loader looks for it.
 #
-# Only java_20 and cpp_14 are built. The Python grammar csim uses publishes no
-# C++ target upstream, and the legacy python3 grammar that does parses slower
-# than the Python runtime, so Python keeps using the pure-Python parser.
+# Supported languages: java_20, java_24 (grammars-v4/java/java), cpp_14.
+# Python uses the pure-Python parser (no C++ target for python_3_13, and legacy
+# python3 C++ target is slower on small CLI files).
 #
 # Requirements:
 #   - antlr4 (the generator) on PATH
@@ -26,7 +26,7 @@ BRIDGE_DIR="$REPO_ROOT/csim/native/src"
 LIB_DIR="$REPO_ROOT/csim/native/lib"
 BUILD_DIR="$REPO_ROOT/build/native"
 
-LANGUAGES=("${@:-java_20 cpp_14}")
+LANGUAGES=("${@:-java_20 java_24 cpp_14}")
 read -r -a LANGUAGES <<< "${LANGUAGES[*]}"
 
 # --- toolchain discovery ----------------------------------------------------
@@ -141,6 +141,16 @@ build_language() {
     (cd "$work" && $ANTLR "$parser_g4" -Dlanguage=Cpp -Xexact-output-dir -no-visitor -no-listener -o .)
     echo "  generated C++ lexer/parser"
 
+    # Ensure ParserBase.h is included in generated Parser.h (ANTLR doesn't do this automatically)
+    local parser_base_name="${parser_g4%.g4}Base"  # e.g. Java24ParserBase from Java24Parser.g4
+    if [ -f "$work/${parser_base_name}.h" ]; then
+        local parser_h="${parser_g4%.g4}.h"
+        if ! grep -q "#include \"${parser_base_name}.h\"" "$work/$parser_h"; then
+            sed -i '' "/#include \"antlr4-runtime.h\"/a\\
+#include \"${parser_base_name}.h\"" "$work/$parser_h"
+        fi
+    fi
+
     cp "$BRIDGE_DIR/${lang}_bridge.cpp" "$work/bridge.cpp"
 
     local sources=(bridge.cpp)
@@ -180,6 +190,10 @@ for lang in "${LANGUAGES[@]}"; do
     case "$lang" in
         java_20)
             build_language java_20 Java20Lexer.g4 Java20Parser.g4 "" libjava20_fast
+            ;;
+        java_24)
+            build_language java_24 Java24Lexer.g4 Java24Parser.g4 \
+                "Java24ParserBase.cpp Java24ParserBase.h" libjava24_fast
             ;;
         cpp_14)
             build_language cpp_14 CPP14Lexer.g4 CPP14Parser.g4 \

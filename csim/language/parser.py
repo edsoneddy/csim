@@ -3,6 +3,8 @@ from ..python_3_13.PythonParser import PythonParser
 from ..python_3_13.PythonLexer import PythonLexer
 from ..java_20.Java20Parser import Java20Parser
 from ..java_20.Java20Lexer import Java20Lexer
+from ..java_24.Java24Parser import Java24Parser
+from ..java_24.Java24Lexer import Java24Lexer
 from ..cpp_14.CPP14Parser import CPP14Parser
 from ..cpp_14.CPP14Lexer import CPP14Lexer
 from antlr4 import InputStream, CommonTokenStream
@@ -27,7 +29,7 @@ def ANTLR_parse(file_name, file_content, lang):
     Args:
         file_name: Name of the source file (used for error reporting).
         file_content: Source code as a string to be parsed.
-        lang: programming language of the source code (e.g. python_3_13, java_20, cpp_14, etc.).
+        lang: programming language of the source code (e.g. python_3_13, java_20, java_24, cpp_14, etc.).
 
     Returns:
         ANTLR parse tree representing the code's syntactic structure.
@@ -65,6 +67,17 @@ def ANTLR_parse(file_name, file_content, lang):
         # Parsing the token stream to create a parse tree
         token_stream = CommonTokenStream(lexer)
         parser = Java20Parser(token_stream)
+        parser.removeErrorListeners()
+        parser.addErrorListener(error_listener)
+        tree = parser.compilationUnit()
+    elif lang == "java_24":
+        # Lexing the input code to create a token stream
+        lexer = Java24Lexer(input_stream)
+        lexer.removeErrorListeners()
+        lexer.addErrorListener(error_listener)
+        # Parsing the token stream to create a parse tree
+        token_stream = CommonTokenStream(lexer)
+        parser = Java24Parser(token_stream)
         parser.removeErrorListeners()
         parser.addErrorListener(error_listener)
         tree = parser.compilationUnit()

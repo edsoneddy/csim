@@ -13,7 +13,7 @@ Code Similarity (csim) provide a module designed to detect similarities between 
 - **Parse Trees:** Represents the syntactic structure of source code, enabling detailed comparisons.
 - **Tree Edit Distance:** Measures the similarity between different code structures.
 - **Hash-Based Pruning:** Optimizes the comparison process by reducing tree size while preserving essential structure.
-- **Multi-Language Support:** Supports Python 3.13, Java 20, and C++14 source code analysis.
+- **Multi-Language Support:** Supports Python 3.13, Java 20, Java 24, and C++14 source code analysis.
 
 ## Technologies Used
 
@@ -59,7 +59,7 @@ pip install csim
 
 For detailed information about search strategies, see: [docs/STRATEGIES.md](docs/STRATEGIES.md)
 
-csim supports three main actions: **report** (for pairwise similarity analysis), **group** (for clustering similar files), and **tree**/**view** (for visualizing a file's normalized/pruned parse tree). The tool supports Python 3.13, Java 20, and C++14 source code files.
+csim supports three main actions: **report** (for pairwise similarity analysis), **group** (for clustering similar files), and **tree**/**view** (for visualizing a file's normalized/pruned parse tree). The tool supports Python 3.13, Java 20, Java 24, and C++14 source code files.
 
 ### General Command Structure
 ```sh
@@ -82,7 +82,7 @@ file2.py is similar to file3.py with similarity index: 0.50
 ```
 
 **Options:**
-- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `cpp_14`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `java_24`, `cpp_14`
 - `--talg, -ta`: Tree edit distance algorithm (default: `apted`). Options: `zss`, `apted`
 
 **Example with options:**
@@ -128,7 +128,7 @@ csim group --path /path/to/directory --threshold 0.8 --strategy exhaustive
 
 - `--threshold, -t`: Similarity threshold (0.0 to 1.0). **Required.**
 - `--strategy, -s`: Grouping strategy (default: `exhaustive`). Options: `exhaustive`
-- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `cpp_14`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `java_24`, `cpp_14`
 - `--talg, -ta`: Tree edit distance algorithm (default: `apted`). Options: `zss`, `apted`
 
 **Complete example:**
@@ -165,7 +165,7 @@ Rule and token names are resolved for readability, `LOOP` marks nodes collapsed 
 
 **Options:**
 - `--path, -p`: Path to a single source code file (**required**).
-- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `cpp_14`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `java_20`, `java_24`, `cpp_14`
 - `--show-raw`: Also print the raw ANTLR parse tree before normalization/pruning, for side-by-side comparison.
 
 **Example with `--show-raw`:**
@@ -187,10 +187,47 @@ csim report --path /path/to/python/files --lang python_3_13
 csim report --path /path/to/java/files --lang java_20
 ```
 
+**Java 24 (experimental):**
+```sh
+csim report --path /path/to/java/files --lang java_24
+```
+
+Java 24 uses an optimized grammar (grammars-v4/java/java) that parses much faster
+than `java_20` when the native parser is available (see [Native Parsers](#native-parsers)
+below), and supports the same modern Java syntax (records, sealed classes, pattern
+matching, switch expressions, text blocks). **However, its similarity/grouping
+output is not yet tuned to match `java_20` and can be significantly less accurate**
+(verified on real submissions — see `CHANGELOG.md`). Use `java_20` for `group`/`report`
+until this is resolved; `java_24` is available for parse-speed experimentation only.
+
 **C++14:**
 ```sh
 csim report --path /path/to/cpp/files --lang cpp_14
 ```
+
+### Native Parsers
+
+For `java_20`, `java_24`, and `cpp_14`, csim can use a compiled C++ ANTLR parser
+instead of the pure-Python one, giving a large speedup with identical output.
+`python_3_13` always uses the pure-Python parser (no C++ target is available for
+that grammar).
+
+Check which backend is active for each language:
+
+```sh
+csim info
+```
+
+If a native library isn't present for a language, csim falls back to the
+pure-Python parser automatically — results are unaffected, only speed. Build
+the native parsers from source with:
+
+```sh
+scripts/build_native_parsers.sh
+```
+
+Set `CSIM_DISABLE_NATIVE=1` to force the pure-Python parsers for every
+language, e.g. for debugging or benchmarking.
 
 ### Threshold Guidance
 

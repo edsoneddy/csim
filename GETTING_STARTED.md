@@ -127,7 +127,7 @@ The `--threshold` parameter determines how similar files must be to be considere
 
 ## Supported Languages
 
-csim supports three programming languages:
+csim supports four programming language configurations:
 
 ### Python 3.13
 ```bash
@@ -138,6 +138,16 @@ csim report --path ./python_files --lang python_3_13
 ```bash
 csim report --path ./java_files --lang java_20
 ```
+
+### Java 24 (experimental — parsing only)
+```bash
+csim report --path ./java_files --lang java_24
+```
+Same `.java` files as `java_20`, parsed with an optimized grammar that's much
+faster when the native C++ parser is built (see `csim info`). **Not yet
+recommended for `group`/`report`**: its similarity output hasn't been tuned to
+match `java_20` and can under-report similarity on real code. Use `java_20`
+for actual comparisons for now.
 
 ### C++14
 ```bash

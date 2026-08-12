@@ -119,10 +119,10 @@ jobs:
           /tmp/venv/bin/csim info
           /tmp/venv/bin/python - <<'PY'
           from csim.native import is_available
-          missing = [lang for lang in ("java_20", "java_24", "cpp_14") if not is_available(lang)]
+          missing = [lang for lang in ("java_20", "java_24", "cpp_14", "python_3") if not is_available(lang)]
           if missing:
               raise SystemExit(f"native parsers not active in the wheel: {missing}")
-          print("native parsers active: java_20, java_24, cpp_14")
+          print("native parsers active: java_20, java_24, cpp_14, python_3")
           PY
 
       - uses: actions/upload-artifact@v4
@@ -209,10 +209,10 @@ jobs:
           /tmp/venv/bin/csim info
           /tmp/venv/bin/python - <<'PY'
           from csim.native import is_available
-          missing = [lang for lang in ("java_20", "java_24", "cpp_14") if not is_available(lang)]
+          missing = [lang for lang in ("java_20", "java_24", "cpp_14", "python_3") if not is_available(lang)]
           if missing:
               raise SystemExit(f"native parsers not active in the wheel: {missing}")
-          print("native parsers active: java_20, java_24, cpp_14")
+          print("native parsers active: java_20, java_24, cpp_14, python_3")
           PY
 
       - uses: actions/upload-artifact@v4

@@ -170,6 +170,14 @@ jobs:
           set -euo pipefail
           for lib in csim/native/lib/*.dylib; do
             echo "== $lib"
+            # The wheel is tagged arm64; a library built for anything else would
+            # be installed by pip and then fail to load.
+            arch="$(lipo -archs "$lib")"
+            echo "architecture: $arch"
+            if [ "$arch" != "arm64" ]; then
+              echo "error: $lib is $arch, expected arm64" >&2
+              exit 1
+            fi
             # Capture once: piping into `grep -q` lets grep exit early, which
             # under `pipefail` fails the pipeline on the producer's EPIPE.
             otool -L "$lib" > /tmp/deps.txt
@@ -187,7 +195,11 @@ jobs:
           # setuptools stages into build/; a stale artifact left there from an
           # earlier build would be copied into the wheel.
           rm -rf build csim.egg-info
-          python setup.py bdist_wheel
+          # Name the platform explicitly. setuptools derives the tag from the
+          # interpreter, and setup-python ships a universal2 build, so the wheel
+          # would claim "universal2" while carrying arm64-only libraries -- an
+          # Intel Mac would install it and silently fall back to Python.
+          python setup.py bdist_wheel --plat-name macosx_14_0_arm64
 
       - name: Smoke test the wheel
         run: |

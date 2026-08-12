@@ -1,5 +1,8 @@
 # Changelog
 
+Notable releases. Earlier entries were reconstructed from the commit history,
+so they summarise each line rather than list every change.
+
 ## [3.1.0]
 
 Native C++ parsers for Java and C++, giving a **6-8x speedup** on `csim group`
@@ -102,3 +105,77 @@ For anyone building on this:
   only on base system libraries.
 - The `.g4` grammars remain a single source of truth for both targets;
   `scripts/transform_grammar_for_cpp.py` adapts them to C++ at build time.
+
+---
+
+## [3.0.0] — 2026-08-10
+
+Explicit language versions, and normalization good enough to see through
+common rewrites.
+
+### Changed
+
+- **Language identifiers now carry a version**: `python` → `python_3_13`,
+  `java` → `java_20`, `cpp` → `cpp_14`. This is the breaking change: any call
+  passing the old identifiers has to be updated. Pinning the version makes it
+  clear which grammar a result came from, and leaves room for other versions
+  later.
+- **`apted` is now the default tree edit distance algorithm**, replacing `zss`.
+  `zss` is still available via `--talg zss`.
+
+### Added
+
+- **`csim tree` / `csim view`** — prints the normalized and pruned tree for a
+  single file: the exact tree the comparison actually runs on. `--show-raw`
+  also prints the raw ANTLR parse tree, which is what you want when a
+  similarity score looks wrong and you need to see why.
+- **Assignment operator normalization** — `x += 1` and `x = x + 1` now compare
+  as equivalent, so rewriting compound assignments no longer hides a copy.
+- Per-language exclusion and hashing rules for all three languages, tuning
+  which tokens and rules carry weight in the comparison.
+
+### Fixed
+
+- C++14 parser predicates used `this.` (valid for other ANTLR targets) instead
+  of `self.`, which broke on the Python target.
+
+---
+
+## [2.0.0] — 2026-07-11
+
+Multi-language support. csim went from a Python-only tool to handling three
+languages.
+
+### Added
+
+- **Java 20 and C++14 support**, alongside Python. Grammars, generated
+  parsers, and per-language normalization rules for each.
+- **Test suite** — CLI and module tests, plus sample files per language.
+- **Continuous integration** via GitHub Actions.
+- `GETTING_STARTED.md` and strategy documentation.
+
+### Changed
+
+- Restructured into modules: `csim/language/` for parsing, `csim/processing/`
+  for tree processing and distance metrics, and one package per language. The
+  language-agnostic pipeline dates from here.
+
+---
+
+## 1.x — 2025-12-24 to 2026-03-11
+
+The Python-only line, where the core comparison method took shape. First
+release was **1.1.0**; there was no 1.0.0.
+
+Notable steps:
+
+- **1.1.0** — initial release: parse trees and tree edit distance over Python
+  source.
+- **1.3.0** — structural hashing to collapse equivalent subtrees.
+- **1.4.0 / 1.4.1** — `PruneAndHash`: pruning the tree before comparison,
+  which is what made larger files practical.
+- **1.5.2** — control-flow equivalence, so a `for` and an equivalent `while`
+  no longer count as unrelated.
+- **1.6.0** — file grouping, built on Union-Find, together with the
+  `--threshold` option. Before this, csim only reported pairwise similarity.
+- **1.7.0** — APTED as an alternative tree edit distance algorithm.

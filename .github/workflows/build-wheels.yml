@@ -130,17 +130,13 @@ jobs:
           name: wheel-linux-x86_64
           path: dist/*.whl
 
+  # Apple Silicon only. The Intel (x86_64) runner images were retired in
+  # December 2025, so a macos-13 job would queue forever and block publishing.
+  # Intel Mac users fall back to the sdist: csim still works, on the Python
+  # parser. GitHub drops macOS x86_64 entirely in late 2027.
   macos:
-    name: macOS wheel (${{ matrix.arch }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-14
-            arch: arm64
-          - os: macos-13
-            arch: x86_64
+    name: macOS wheel (arm64)
+    runs-on: macos-14
 
     steps:
       - uses: actions/checkout@v4
@@ -209,7 +205,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel-macos-${{ matrix.arch }}
+          name: wheel-macos-arm64
           path: dist/*.whl
 
   sdist:

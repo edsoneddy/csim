@@ -143,21 +143,43 @@ build_language() {
     echo "  generated C++ lexer/parser"
 
     # Ensure ParserBase.h/LexerBase.h are included in the generated .h files
-    # (ANTLR doesn't do this automatically for every grammar).
+    # (ANTLR doesn't do this automatically for every grammar). Done via
+    # Python, not sed -i: BSD sed (macOS) and GNU sed (Linux CI) take -i's
+    # backup-suffix argument differently -- `sed -i ''` only works on BSD,
+    # and silently treats the script as a filename on GNU sed, failing with
+    # "No such file or directory". Python's file handling doesn't have that
+    # split, and the script already depends on Python being present (see the
+    # transform_grammar_for_cpp.py call above).
     local parser_base_name="${parser_g4%.g4}Base"  # e.g. Java24ParserBase from Java24Parser.g4
     if [ -f "$work/${parser_base_name}.h" ]; then
         local parser_h="${parser_g4%.g4}.h"
         if ! grep -q "#include \"${parser_base_name}.h\"" "$work/$parser_h"; then
-            sed -i '' "/#include \"antlr4-runtime.h\"/a\\
-#include \"${parser_base_name}.h\"" "$work/$parser_h"
+            python3 -c "
+import pathlib
+p = pathlib.Path('$work/$parser_h')
+text = p.read_text()
+p.write_text(text.replace(
+    '#include \"antlr4-runtime.h\"',
+    '#include \"antlr4-runtime.h\"\n#include \"${parser_base_name}.h\"',
+    1,
+))
+"
         fi
     fi
     local lexer_base_name="${lexer_g4%.g4}Base"
     if [ -f "$work/${lexer_base_name}.h" ]; then
         local lexer_h="${lexer_g4%.g4}.h"
         if ! grep -q "#include \"${lexer_base_name}.h\"" "$work/$lexer_h"; then
-            sed -i '' "/#include \"antlr4-runtime.h\"/a\\
-#include \"${lexer_base_name}.h\"" "$work/$lexer_h"
+            python3 -c "
+import pathlib
+p = pathlib.Path('$work/$lexer_h')
+text = p.read_text()
+p.write_text(text.replace(
+    '#include \"antlr4-runtime.h\"',
+    '#include \"antlr4-runtime.h\"\n#include \"${lexer_base_name}.h\"',
+    1,
+))
+"
         fi
     fi
 

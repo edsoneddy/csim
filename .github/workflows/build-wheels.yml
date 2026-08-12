@@ -88,11 +88,14 @@ jobs:
           set -euo pipefail
           for lib in csim/native/lib/*.so; do
             echo "== $lib"
-            ldd "$lib"
+            # Capture once: piping into `grep -q` lets grep exit early, which
+            # under `pipefail` fails the pipeline on the producer's EPIPE.
+            ldd "$lib" > /tmp/deps.txt
+            cat /tmp/deps.txt
             # A dependency on libstdc++ or libantlr4 would mean the static link
             # silently did not take effect, and the wheel would break on hosts
             # lacking those libraries.
-            if ldd "$lib" | grep -Eq 'libstdc\+\+|libantlr4'; then
+            if grep -Eq 'libstdc\+\+|libantlr4' /tmp/deps.txt; then
               echo "error: $lib links a C++/ANTLR runtime dynamically" >&2
               exit 1
             fi
@@ -171,10 +174,13 @@ jobs:
           set -euo pipefail
           for lib in csim/native/lib/*.dylib; do
             echo "== $lib"
-            otool -L "$lib"
+            # Capture once: piping into `grep -q` lets grep exit early, which
+            # under `pipefail` fails the pipeline on the producer's EPIPE.
+            otool -L "$lib" > /tmp/deps.txt
+            cat /tmp/deps.txt
             # Homebrew paths here would mean the ANTLR runtime was linked
             # dynamically, making the wheel unusable off this machine.
-            if otool -L "$lib" | grep -q 'antlr4-runtime'; then
+            if grep -q 'antlr4-runtime' /tmp/deps.txt; then
               echo "error: $lib links the ANTLR runtime dynamically" >&2
               exit 1
             fi
@@ -226,17 +232,31 @@ jobs:
       - name: Verify the sdist carries no platform binaries
         run: |
           set -euo pipefail
+
+          # List once into a file rather than piping tar into grep repeatedly:
+          # `grep -q` exits at the first match, tar then gets EPIPE and returns
+          # non-zero, and under `pipefail` that fails the pipeline even though
+          # the grep succeeded.
+          tar tzf dist/*.tar.gz > /tmp/sdist-contents.txt
+          echo "sdist contains $(wc -l < /tmp/sdist-contents.txt) entries"
+
           # The sdist is the fallback for platforms without a wheel. Shipping a
           # macOS .dylib inside it would install a library that cannot load.
-          if tar tzf dist/*.tar.gz | grep -E '\.(so|dylib|dll)$'; then
+          if grep -E '\.(so|dylib|dll)$' /tmp/sdist-contents.txt; then
             echo "error: sdist contains compiled libraries" >&2
             exit 1
           fi
+
           # It must still carry what is needed to rebuild them.
           for required in grammars/ scripts/build_native_parsers.sh csim/native/src/; do
-            tar tzf dist/*.tar.gz | grep -q "$required" \
-              || { echo "error: sdist is missing $required" >&2; exit 1; }
+            if ! grep -q "$required" /tmp/sdist-contents.txt; then
+              echo "error: sdist is missing $required" >&2
+              echo "sdist contents were:" >&2
+              cat /tmp/sdist-contents.txt >&2
+              exit 1
+            fi
           done
+
           echo "sdist verified: sources present, no binaries"
 
       - uses: actions/upload-artifact@v4

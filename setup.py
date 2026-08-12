@@ -1,9 +1,61 @@
+import glob
+
 from setuptools import setup, find_packages
+from setuptools.dist import Distribution
+
+# Compiled parsers are platform-specific. Without this, setuptools would tag the
+# wheel "py3-none-any" and PyPI would serve a macOS .dylib to Linux installs,
+# where it silently fails to load and csim falls back to the Python parser with
+# no speedup and no error. Marking the distribution impure forces a platform tag
+# so each wheel only installs where its binaries actually run.
+_HAS_NATIVE_LIBS = bool(
+    glob.glob("csim/native/lib/*.so")
+    + glob.glob("csim/native/lib/*.dylib")
+    + glob.glob("csim/native/lib/*.dll")
+)
+
+
+class BinaryDistribution(Distribution):
+    def has_ext_modules(self):
+        return _HAS_NATIVE_LIBS
+
+    def is_pure(self):
+        return not _HAS_NATIVE_LIBS
+
+
+# The parsers are loaded through ctypes and use no CPython API, so they work on
+# any Python 3. Left alone, setuptools would tag an impure wheel for the exact
+# interpreter that built it (cp314-cp314), and every other Python version would
+# fall back to an sdist with no binaries.
+_cmdclass = {}
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+    class bdist_wheel(_bdist_wheel):
+        def finalize_options(self):
+            super().finalize_options()
+            if _HAS_NATIVE_LIBS:
+                self.root_is_pure = False
+
+        def get_tag(self):
+            python, abi, platform = super().get_tag()
+            if _HAS_NATIVE_LIBS:
+                python, abi = "py3", "none"
+            return python, abi, platform
+
+    _cmdclass["bdist_wheel"] = bdist_wheel
+except ImportError:
+    pass  # `wheel` absent: sdist-only build, nothing to retag.
 
 setup(
     name="csim",
-    version="3.0.2",
+    version="3.1.0",
     packages=find_packages(),
+    # Compiled native parsers, when built (scripts/build_native_parsers.sh).
+    # Absent builds are fine: csim falls back to the pure-Python parsers.
+    package_data={"csim": ["native/lib/*.so", "native/lib/*.dylib", "native/lib/*.dll"]},
+    distclass=BinaryDistribution,
+    cmdclass=_cmdclass,
     install_requires=[
         "antlr4-python3-runtime==4.13.2",
         "zss==1.2.0",

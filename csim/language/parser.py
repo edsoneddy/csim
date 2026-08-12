@@ -33,6 +33,14 @@ def ANTLR_parse(file_name, file_content, lang):
         ANTLR parse tree representing the code's syntactic structure.
     """
 
+    # Fast path: ANTLR's C++ runtime, when a compiled parser is available for
+    # this language. Returns None (and falls through) if unavailable or failed.
+    from ..native import native_parse
+
+    native_tree = native_parse(file_content, lang)
+    if native_tree is not None:
+        return native_tree
+
     tree = None
     parser = None
     input_stream = InputStream(file_content)

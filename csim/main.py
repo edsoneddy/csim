@@ -11,15 +11,64 @@ from .utils import (
 )
 
 
+def print_backend_info():
+    """Report which parser backend each language will use.
+
+    When a compiled parser is missing or fails to load, csim silently falls back
+    to the Python parser: results stay correct, but parsing runs several times
+    slower. This makes that state visible instead of leaving it to be inferred
+    from timings.
+    """
+    from .native.loader import (
+        _LIB_DIR,
+        _NATIVE_CONFIG,
+        _disabled,
+        _library_suffix,
+        is_available,
+    )
+
+    print("csim parser backends")
+    print()
+
+    turned_off = _disabled()
+
+    for lang in ("python_3_13", "java_20", "cpp_14"):
+        if lang not in _NATIVE_CONFIG:
+            print(f"  {lang:<14} python   (no native parser for this grammar)")
+            continue
+
+        expected = _LIB_DIR / (_NATIVE_CONFIG[lang][0] + _library_suffix())
+
+        if turned_off:
+            state = "available but disabled" if expected.is_file() else "not built"
+        elif is_available(lang):
+            print(f"  {lang:<14} native   (C++, several times faster)")
+            continue
+        else:
+            state = "not built" if not expected.is_file() else "present but failed to load"
+
+        print(f"  {lang:<14} python   (native {state})")
+
+    if turned_off:
+        print()
+        print("  note: CSIM_DISABLE_NATIVE is set, so native parsers are turned off.")
+
+    print()
+    print(f"  library directory: {_LIB_DIR}")
+    print("  build native parsers with: scripts/build_native_parsers.sh")
+
+
 def main():
     """
     Main function to parse command-line arguments and execute the similarity checker.
-    
+
     Actions:
         report: Generate a pairwise similarity report for all files.
         group: Group files by similarity using a specified strategy.
         tree (alias: view): Print the normalized/pruned tree for a single file,
             i.e. the exact tree that gets passed to the tree edit distance algorithm.
+        info: Report which parser backend (native C++ or pure Python) is active
+            for each language. Takes no arguments.
 
     Arguments for 'report' action:
         --path, -p (str): Path to a directory containing source code files (required).
@@ -48,17 +97,17 @@ def main():
     # Action argument (positional)
     parser.add_argument(
         "action",
-        choices=["report", "group", "tree", "view"],
+        choices=["report", "group", "tree", "view", "info"],
         help="Action to perform: 'report' for pairwise similarity report, 'group' for grouping "
-        "files by similarity, 'tree'/'view' to print a single file's normalized/pruned tree.",
+        "files by similarity, 'tree'/'view' to print a single file's normalized/pruned tree, "
+        "'info' to show which parser backend is active.",
     )
 
-    # Required path argument
+    # Required for every action except 'info', which inspects the install itself.
     parser.add_argument(
         "--path",
         "-p",
         type=str,
-        required=True,
         help="Path to a directory containing source code files.",
     )
 
@@ -107,6 +156,13 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.action == "info":
+        print_backend_info()
+        return
+
+    if not args.path:
+        parser.error("The --path argument is required for this action.")
 
     if args.action in ("tree", "view"):
         if not os.path.isfile(args.path):

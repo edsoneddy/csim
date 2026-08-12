@@ -1,0 +1,264 @@
+name: Build wheels
+
+# Publishing csim means shipping compiled parsers, and those must be built on
+# each target platform: a macOS .dylib cannot load on Render's Linux containers.
+# Without a matching wheel, pip falls back to the sdist and csim silently runs
+# on the pure-Python parser -- correct results, several times slower.
+#
+# cibuildwheel is deliberately not used here. It builds one wheel per CPython
+# version, which is what extension modules need; csim's parsers are loaded via
+# ctypes and use no CPython API, so a single py3-none-<platform> wheel is both
+# correct and simpler. Under cibuildwheel every Python version would collapse
+# onto the same filename.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Upload to PyPI after building"
+        type: boolean
+        default: false
+
+env:
+  # The generated C++ only compiles against its own runtime version, so the jar
+  # and the runtime are pinned together.
+  ANTLR_VERSION: "4.13.2"
+
+jobs:
+  linux:
+    name: Linux wheel (manylinux)
+    runs-on: ubuntu-latest
+    # AlmaLinux 8 / glibc 2.28: older than Debian bookworm (2.36) used by
+    # python:3.11-slim, so the result loads there and on anything newer.
+    container: quay.io/pypa/manylinux_2_28_x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          yum install -y java-17-openjdk-headless cmake unzip
+          echo "JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))" >> $GITHUB_ENV
+
+      - name: Cache ANTLR C++ runtime
+        id: cache-antlr
+        uses: actions/cache@v4
+        with:
+          path: /opt/antlr-runtime
+          key: antlr-cpp-${{ env.ANTLR_VERSION }}-manylinux_2_28_x86_64
+
+      - name: Build ANTLR C++ runtime
+        if: steps.cache-antlr.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/runtime.zip \
+            "https://www.antlr.org/download/antlr4-cpp-runtime-${ANTLR_VERSION}-source.zip"
+          mkdir -p /tmp/antlr-src && unzip -q /tmp/runtime.zip -d /tmp/antlr-src
+          cmake -S /tmp/antlr-src -B /tmp/antlr-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DANTLR4_INSTALL=ON \
+            -DCMAKE_INSTALL_PREFIX=/opt/antlr-runtime \
+            -DWITH_DEMO=OFF \
+            -DANTLR_BUILD_CPP_TESTS=OFF \
+            -DANTLR_BUILD_SHARED=OFF
+          cmake --build /tmp/antlr-build -j"$(nproc)"
+          cmake --install /tmp/antlr-build
+
+      - name: Download ANTLR generator
+        run: |
+          curl -fsSL -o /tmp/antlr.jar \
+            "https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
+
+      - name: Build native parsers
+        env:
+          ANTLR_JAR: /tmp/antlr.jar
+          ANTLR_CPP_INCLUDE: /opt/antlr-runtime/include/antlr4-runtime
+          ANTLR_CPP_LIB: /opt/antlr-runtime/lib
+        run: |
+          /opt/python/cp311-cp311/bin/python -m pip install --quiet setuptools wheel
+          export PATH="/opt/python/cp311-cp311/bin:$PATH"
+          bash scripts/build_native_parsers.sh
+
+      - name: Verify the libraries only need base system libs
+        run: |
+          set -euo pipefail
+          for lib in csim/native/lib/*.so; do
+            echo "== $lib"
+            ldd "$lib"
+            # A dependency on libstdc++ or libantlr4 would mean the static link
+            # silently did not take effect, and the wheel would break on hosts
+            # lacking those libraries.
+            if ldd "$lib" | grep -Eq 'libstdc\+\+|libantlr4'; then
+              echo "error: $lib links a C++/ANTLR runtime dynamically" >&2
+              exit 1
+            fi
+          done
+
+      - name: Build wheel
+        run: |
+          export PATH="/opt/python/cp311-cp311/bin:$PATH"
+          # setuptools stages into build/; a stale artifact left there from an
+          # earlier build would be copied into the wheel.
+          rm -rf build csim.egg-info
+          python setup.py bdist_wheel --plat-name manylinux_2_28_x86_64
+
+      - name: Smoke test the wheel
+        run: |
+          set -euo pipefail
+          /opt/python/cp311-cp311/bin/python -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet dist/*.whl
+          # `csim info` reports the active backend; anything but "native" here
+          # means the wheel would install but quietly run the slow path.
+          /tmp/venv/bin/csim info
+          /tmp/venv/bin/python - <<'PY'
+          from csim.native import is_available
+          missing = [lang for lang in ("java_20", "cpp_14") if not is_available(lang)]
+          if missing:
+              raise SystemExit(f"native parsers not active in the wheel: {missing}")
+          print("native parsers active: java_20, cpp_14")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-x86_64
+          path: dist/*.whl
+
+  macos:
+    name: macOS wheel (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-13
+            arch: x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install ANTLR C++ runtime
+        run: brew install antlr4-cpp-runtime
+
+      - name: Download ANTLR generator
+        run: |
+          curl -fsSL -o /tmp/antlr.jar \
+            "https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
+
+      - name: Build native parsers
+        env:
+          ANTLR_JAR: /tmp/antlr.jar
+        run: |
+          python -m pip install --quiet setuptools wheel
+          bash scripts/build_native_parsers.sh
+
+      - name: Verify the libraries only need base system libs
+        run: |
+          set -euo pipefail
+          for lib in csim/native/lib/*.dylib; do
+            echo "== $lib"
+            otool -L "$lib"
+            # Homebrew paths here would mean the ANTLR runtime was linked
+            # dynamically, making the wheel unusable off this machine.
+            if otool -L "$lib" | grep -q 'antlr4-runtime'; then
+              echo "error: $lib links the ANTLR runtime dynamically" >&2
+              exit 1
+            fi
+          done
+
+      - name: Build wheel
+        run: |
+          # setuptools stages into build/; a stale artifact left there from an
+          # earlier build would be copied into the wheel.
+          rm -rf build csim.egg-info
+          python setup.py bdist_wheel
+
+      - name: Smoke test the wheel
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet dist/*.whl
+          /tmp/venv/bin/csim info
+          /tmp/venv/bin/python - <<'PY'
+          from csim.native import is_available
+          missing = [lang for lang in ("java_20", "cpp_14") if not is_available(lang)]
+          if missing:
+              raise SystemExit(f"native parsers not active in the wheel: {missing}")
+          print("native parsers active: java_20, cpp_14")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-macos-${{ matrix.arch }}
+          path: dist/*.whl
+
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build sdist
+        run: |
+          python -m pip install --quiet setuptools wheel
+          # setuptools stages into build/; a stale artifact left there from an
+          # earlier build would be copied into the wheel.
+          rm -rf build csim.egg-info
+          python setup.py sdist
+
+      - name: Verify the sdist carries no platform binaries
+        run: |
+          set -euo pipefail
+          # The sdist is the fallback for platforms without a wheel. Shipping a
+          # macOS .dylib inside it would install a library that cannot load.
+          if tar tzf dist/*.tar.gz | grep -E '\.(so|dylib|dll)$'; then
+            echo "error: sdist contains compiled libraries" >&2
+            exit 1
+          fi
+          # It must still carry what is needed to rebuild them.
+          for required in grammars/ scripts/build_native_parsers.sh csim/native/src/; do
+            tar tzf dist/*.tar.gz | grep -q "$required" \
+              || { echo "error: sdist is missing $required" >&2; exit 1; }
+          done
+          echo "sdist verified: sources present, no binaries"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    name: Publish to PyPI
+    needs: [linux, macos, sdist]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
+    environment: pypi
+    permissions:
+      id-token: write  # PyPI trusted publishing; no API token to store
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List what will be published
+        run: ls -lh dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -13,7 +13,7 @@ Code Similarity (csim) provide a module designed to detect similarities between 
 - **Parse Trees:** Represents the syntactic structure of source code, enabling detailed comparisons.
 - **Tree Edit Distance:** Measures the similarity between different code structures.
 - **Hash-Based Pruning:** Optimizes the comparison process by reducing tree size while preserving essential structure.
-- **Multi-Language Support:** Supports Python 3.13, Python 3 (universal grammar), Java 20, Java 24, and C++14 source code analysis.
+- **Multi-Language Support:** Supports Python 3.13, Python 3 (universal grammar), Java 20, Java 24, C++14, Kotlin (experimental), and C (experimental) source code analysis.
 
 ## Technologies Used
 
@@ -59,7 +59,7 @@ pip install csim
 
 For detailed information about search strategies, see: [docs/STRATEGIES.md](docs/STRATEGIES.md)
 
-csim supports three main actions: **report** (for pairwise similarity analysis), **group** (for clustering similar files), and **tree**/**view** (for visualizing a file's normalized/pruned parse tree). The tool supports Python 3.13, Java 20, Java 24, and C++14 source code files.
+csim supports three main actions: **report** (for pairwise similarity analysis), **group** (for clustering similar files), and **tree**/**view** (for visualizing a file's normalized/pruned parse tree). The tool supports Python 3.13, Python 3, Java 20, Java 24, C++14, Kotlin (experimental), and C (experimental) source code files.
 
 ### General Command Structure
 ```sh

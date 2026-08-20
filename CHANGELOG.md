@@ -3,7 +3,7 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
-## [Unreleased]
+## [3.3.0]
 
 ### New language: C (experimental, grammars-v4/c)
 

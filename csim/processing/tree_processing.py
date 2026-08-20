@@ -6,6 +6,8 @@ from ..Visitors import (
     Java24ParserVisitorExtended,
     CPP14ParserVisitorExtended,
     Python3ParserVisitorExtended,
+    KotlinParserVisitorExtended,
+    CParserVisitorExtended,
 )
 from ..utils import (
     TOKEN_TYPE_OFFSET,
@@ -36,6 +38,10 @@ def get_parser_visitor_class(lang):
         base_visitor = CPP14ParserVisitorExtended
     elif lang == "python_3":
         base_visitor = Python3ParserVisitorExtended
+    elif lang == "kotlin":
+        base_visitor = KotlinParserVisitorExtended
+    elif lang == "c":
+        base_visitor = CParserVisitorExtended
 
     if base_visitor is None:
         raise ValueError(f"Unsupported language: {lang}")

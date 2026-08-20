@@ -7,7 +7,12 @@
 # into csim/native/lib/ where the loader looks for it.
 #
 # Supported languages: java_20, java_24 (grammars-v4/java/java), cpp_14,
-# python_3 (grammars-v4/python/python, the "universal Python 2/3" grammar).
+# python_3 (grammars-v4/python/python, the "universal Python 2/3" grammar),
+# kotlin (grammars-v4/kotlin/kotlin -- no custom base class needed, this
+# grammar declares no superClass at all), c (grammars-v4/c -- ships a real
+# symbol-table implementation for typedef disambiguation; the vendored
+# CLexerBase/CParserBase default to --nopp and never shell out to a real
+# preprocessor, see grammars/CLexerBase.h for why).
 # python_3_13 (the modern grammar) has no C++ target upstream and keeps using
 # the pure-Python parser; python_3 is a separate, additional language key.
 #
@@ -27,7 +32,7 @@ BRIDGE_DIR="$REPO_ROOT/csim/native/src"
 LIB_DIR="$REPO_ROOT/csim/native/lib"
 BUILD_DIR="$REPO_ROOT/build/native"
 
-LANGUAGES=("${@:-java_20 java_24 cpp_14 python_3}")
+LANGUAGES=("${@:-java_20 java_24 cpp_14 python_3 kotlin c}")
 read -r -a LANGUAGES <<< "${LANGUAGES[*]}"
 
 # --- toolchain discovery ----------------------------------------------------
@@ -235,6 +240,21 @@ for lang in "${LANGUAGES[@]}"; do
             build_language python_3 Python3Lexer.g4 Python3Parser.g4 \
                 "Python3LexerBase.cpp Python3LexerBase.h Python3ParserBase.cpp Python3ParserBase.h" \
                 libpython3_fast
+            ;;
+        kotlin)
+            # No C++ base class needed -- the grammar declares no superClass.
+            # UnicodeClasses.g4 is an imported lexer grammar (not a base
+            # class); it must be present alongside KotlinLexer.g4 for ANTLR's
+            # `import UnicodeClasses;` to resolve, but ANTLR inlines it
+            # directly into the generated lexer (no separate .cpp/.h of its
+            # own), so it needs copying, not compiling.
+            build_language kotlin KotlinLexer.g4 KotlinParser.g4 \
+                "UnicodeClasses.g4" libkotlin_fast
+            ;;
+        c)
+            build_language c CLexer.g4 CParser.g4 \
+                "CLexerBase.cpp CLexerBase.h CParserBase.cpp CParserBase.h SymbolTable.cpp SymbolTable.h Symbol.h TypeClassification.h" \
+                libc_fast
             ;;
         *)
             echo "error: no native parser is defined for '$lang'" >&2

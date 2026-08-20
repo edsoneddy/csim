@@ -3,6 +3,8 @@ from .java_20.Java20ParserVisitor import Java20ParserVisitor
 from .java_24.Java24ParserVisitor import Java24ParserVisitor
 from .cpp_14.CPP14ParserVisitor import CPP14ParserVisitor
 from .python_3.Python3ParserVisitor import Python3ParserVisitor
+from .kotlin.KotlinParserVisitor import KotlinParserVisitor
+from .c.CParserVisitor import CParserVisitor
 from antlr4 import TerminalNode
 from .java_20.utils import (
     COLLAPSED_RULE_INDICES as JAVA_20_COLLAPSED_RULES,
@@ -35,6 +37,12 @@ from .cpp_14.utils import (
     COLLAPSED_RULE_INDICES as CPP_14_COLLAPSED_RULES,
     ASIGN_OP_NORMALIZED as CPP_14_ASSIGN_OP_NORMALIZED,
     RULE_ASSIGNMENT as CPP_14_RULE_ASSIGNMENT,
+)
+from .kotlin.utils import (
+    COLLAPSED_RULE_INDICES as KOTLIN_COLLAPSED_RULES,
+)
+from .c.utils import (
+    COLLAPSED_RULE_INDICES as C_COLLAPSED_RULES,
 )
 
 
@@ -180,6 +188,43 @@ class CPP14ParserVisitorExtended(CPP14ParserVisitor):
         else:
             # For regular assignment, just visit the children as usual
             return self.visitChildren(node)
+
+
+class KotlinParserVisitorExtended(KotlinParserVisitor):
+    def visit(self, tree):
+        """Override visit to exclude certain rules from being processed.
+        This helps in reducing noise in the parse tree by skipping over
+        less relevant constructs.
+
+        No visitAssignment-style override here: Kotlin's grammar has no
+        ANTLR labeled alternatives at all (unlike java_24/python_3), so
+        there's no relabel_node() hook needed either -- see
+        csim/kotlin/utils.py's module docstring.
+        """
+        if (
+            not isinstance(tree, TerminalNode)
+            and tree.getRuleIndex() in KOTLIN_COLLAPSED_RULES
+        ):
+            return {"label": tree.getRuleIndex(), "children": []}
+        return tree.accept(self)
+
+
+class CParserVisitorExtended(CParserVisitor):
+    def visit(self, tree):
+        """Override visit to exclude certain rules from being processed.
+        This helps in reducing noise in the parse tree by skipping over
+        less relevant constructs.
+
+        No visitAssignment-style override here: no relabel_node() hook is
+        needed either -- see csim/c/utils.py's module docstring (this
+        grammar has no ANTLR labeled alternatives at all).
+        """
+        if (
+            not isinstance(tree, TerminalNode)
+            and tree.getRuleIndex() in C_COLLAPSED_RULES
+        ):
+            return {"label": tree.getRuleIndex(), "children": []}
+        return tree.accept(self)
 
 
 class Python3ParserVisitorExtended(Python3ParserVisitor):

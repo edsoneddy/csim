@@ -9,6 +9,11 @@ from ..cpp_14.CPP14Parser import CPP14Parser
 from ..cpp_14.CPP14Lexer import CPP14Lexer
 from ..python_3.Python3Parser import Python3Parser
 from ..python_3.Python3Lexer import Python3Lexer
+from ..kotlin.KotlinParser import KotlinParser
+from ..kotlin.KotlinLexer import KotlinLexer
+from ..c.CParser import CParser
+from ..c.CLexer import CLexer
+from ..c.CLexerBase import CLexerBase
 from antlr4 import InputStream, CommonTokenStream
 from antlr4.error.ErrorListener import ErrorListener
 
@@ -105,6 +110,33 @@ def ANTLR_parse(file_name, file_content, lang):
         parser.removeErrorListeners()
         parser.addErrorListener(error_listener)
         tree = parser.file_input()
+    elif lang == "kotlin":
+        # Lexing the input code to create a token stream
+        lexer = KotlinLexer(input_stream)
+        lexer.removeErrorListeners()
+        lexer.addErrorListener(error_listener)
+        # Parsing the token stream to create a parse tree
+        token_stream = CommonTokenStream(lexer)
+        parser = KotlinParser(token_stream)
+        parser.removeErrorListeners()
+        parser.addErrorListener(error_listener)
+        tree = parser.kotlinFile()
+    elif lang == "c":
+        # CLexerBase already defaults to --nopp (no real preprocessing) when
+        # no args are configured -- see grammars/CLexerBase.h -- but set it
+        # explicitly so the intent doesn't silently depend on that default
+        # never changing (mirrors csim/native/src/c_bridge.cpp).
+        CLexerBase.set_args(["--nopp"])
+        # Lexing the input code to create a token stream
+        lexer = CLexer(input_stream)
+        lexer.removeErrorListeners()
+        lexer.addErrorListener(error_listener)
+        # Parsing the token stream to create a parse tree
+        token_stream = CommonTokenStream(lexer)
+        parser = CParser(token_stream)
+        parser.removeErrorListeners()
+        parser.addErrorListener(error_listener)
+        tree = parser.compilationUnit()
     else:
         raise ValueError(f"Unsupported language: {lang}")
 

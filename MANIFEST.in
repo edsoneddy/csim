@@ -7,6 +7,14 @@ include scripts/build_native_parsers.sh
 include scripts/transform_grammar_for_cpp.py
 include csim/native/src/*.cpp
 
+# The C grammar's symbol-table implementation (typedef disambiguation) --
+# doesn't match the *Base.cpp/*Base.h patterns above since it isn't a
+# lexer/parser base class.
+include grammars/SymbolTable.cpp
+include grammars/SymbolTable.h
+include grammars/Symbol.h
+include grammars/TypeClassification.h
+
 include README.md
 include LICENSE
 

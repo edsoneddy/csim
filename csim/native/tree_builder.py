@@ -118,8 +118,22 @@ def build_tree(buffer, rule_names, literal_names=None):
     Args:
         buffer: Flat int32 sequence of (label, num_children) pairs, preorder.
         rule_names: Parser rule names indexed by rule index.
-        literal_names: Lexer literal names indexed by token type; used to give
-            terminals their source text. Optional.
+        literal_names: dict mapping token type -> unquoted literal text (see
+            csim/native/loader.py's _literal_names(), which builds this from
+            the generated .tokens file). Used to give fixed-spelling terminals
+            (keywords, punctuation) their source text; identifier/literal-value
+            tokens have no entry and get "". Optional.
+
+            NOT the generated Lexer class's own `literalNames` list: that list
+            is indexed by declaration order, not by token type, so raw
+            `literalNames[token_type]` indexing silently returns the WRONG
+            literal (confirmed on both CPP14Lexer and KotlinLexer -- e.g.
+            `CPP14Lexer.literalNames[CPP14Lexer.LeftParen]` is `"'/'"`, not
+            `"'('"`). ANTLR's own runtime (antlr4/IntervalSet.py's
+            elementName()) indexes it the same naive way, so this is an
+            upstream code-generation quirk, not a csim-specific bug -- the
+            .tokens file (`'<literal>'=<type>` / `NAME=<type>` lines) is the
+            one artifact confirmed correctly keyed by the real token type.
 
     Returns:
         The root node, or None when the buffer is empty.
@@ -133,14 +147,10 @@ def build_tree(buffer, rule_names, literal_names=None):
         raise ValueError(f"Malformed native buffer: odd length {len(buffer)}")
 
     visit_methods = _visit_method_names(rule_names)
-    total = len(literal_names) if literal_names else 0
 
     def _terminal_text(token_type):
-        if literal_names and 0 <= token_type < total:
-            literal = literal_names[token_type]
-            # ANTLR stores literals quoted ("'+='"); bare names mean no literal.
-            if len(literal) >= 2 and literal[0] == "'" and literal[-1] == "'":
-                return literal[1:-1]
+        if literal_names:
+            return literal_names.get(token_type, "")
         return ""
 
     root = None

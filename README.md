@@ -82,7 +82,7 @@ file2.py is similar to file3.py with similarity index: 0.50
 ```
 
 **Options:**
-- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `python_3`, `java_20`, `java_24`, `cpp_14`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `python_3`, `java_20`, `java_24`, `cpp_14`, `kotlin`, `c`
 - `--talg, -ta`: Tree edit distance algorithm (default: `apted`). Options: `zss`, `apted`
 
 **Example with options:**
@@ -128,7 +128,7 @@ csim group --path /path/to/directory --threshold 0.8 --strategy exhaustive
 
 - `--threshold, -t`: Similarity threshold (0.0 to 1.0). **Required.**
 - `--strategy, -s`: Grouping strategy (default: `exhaustive`). Options: `exhaustive`
-- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `python_3`, `java_20`, `java_24`, `cpp_14`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `python_3`, `java_20`, `java_24`, `cpp_14`, `kotlin`, `c`
 - `--talg, -ta`: Tree edit distance algorithm (default: `apted`). Options: `zss`, `apted`
 
 **Complete example:**
@@ -165,7 +165,7 @@ Rule and token names are resolved for readability, `LOOP` marks nodes collapsed 
 
 **Options:**
 - `--path, -p`: Path to a single source code file (**required**).
-- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `python_3`, `java_20`, `java_24`, `cpp_14`
+- `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `python_3`, `java_20`, `java_24`, `cpp_14`, `kotlin`, `c`
 - `--show-raw`: Also print the raw ANTLR parse tree before normalization/pruning, for side-by-side comparison.
 
 **Example with `--show-raw`:**
@@ -222,13 +222,48 @@ until this is resolved; `java_24` is available for parse-speed experimentation o
 csim report --path /path/to/cpp/files --lang cpp_14
 ```
 
+**Kotlin (experimental):**
+```sh
+csim report --path /path/to/kotlin/files --lang kotlin
+```
+
+First-cut integration (grammars-v4/kotlin/kotlin) with a working native parser
+(no C++ base class needed at all -- this grammar declares no `superClass`).
+Unlike `java_24`/`python_3`, there is no real-world Kotlin corpus in this
+project's benchmark set to tune or validate grouping precision against yet, so
+the normalization rules (`csim/kotlin/utils.py`) follow the same *categories*
+already validated for other languages (structural punctuation, identifier
+text, import/package plumbing, body-wrapping content) but haven't been
+corpus-measured for false-positive/false-negative rates. Treat `group`/`report`
+results as a reasonable starting point, not a tuned config, until a real
+corpus drives the next pass.
+
+**C (experimental):**
+```sh
+csim report --path /path/to/c/files --lang c
+```
+
+First-cut integration (grammars-v4/c, ISO C23 + GNU/MSVC extensions), with a
+working native parser backed by a real symbol-table implementation for
+typedef disambiguation. Like Kotlin, there's no real-world C corpus in this
+project's benchmark set to tune grouping precision against yet -- same
+caveats apply, see `csim/c/utils.py`.
+
+Runs with preprocessing disabled (`--nopp`) always: a real preprocessor can't
+be assumed present in a production container, and judge submissions have no
+consistent include paths anyway. `#include`/`#define`/etc. lines are
+swallowed as hidden tokens rather than expanded, which means macro-dependent
+code (token-pasting tricks, macros used for control flow) can fail to parse
+or parse differently than a real compiler would see it -- real submissions
+essentially never rely on that, but it's a known, real limitation.
+
 ### Native Parsers
 
-For `java_20`, `java_24`, `cpp_14`, and `python_3`, csim can use a compiled C++
-ANTLR parser instead of the pure-Python one, giving a large speedup with
-identical (or, for `java_24`, not-yet-identical -- see above) output.
-`python_3_13` always uses the pure-Python parser (no C++ target is available for
-that grammar).
+For `java_20`, `java_24`, `cpp_14`, `python_3`, `kotlin`, and `c`, csim can
+use a compiled C++ ANTLR parser instead of the pure-Python one, giving a
+large speedup with identical (or, for `java_24`, not-yet-identical -- see
+above) output. `python_3_13` always uses the pure-Python parser (no C++
+target is available for that grammar).
 
 Check which backend is active for each language:
 

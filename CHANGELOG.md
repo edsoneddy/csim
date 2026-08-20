@@ -3,6 +3,131 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+## [Unreleased]
+
+### New language: C (experimental, grammars-v4/c)
+
+Added C as a fully new language to csim (ISO C23 grammar + GNU/MSVC
+extensions), the same shape of addition as Kotlin above: a pure-Python
+parser (`csim/c/`), a native C++ parser backed by a real symbol-table
+implementation for typedef disambiguation, and the full
+Normalize/PruneAndHash pipeline (`csim/c/utils.py`).
+
+**Performance** (single cold pass, one process, 70-file synthetic
+judge-style corpus, plus a 25-file adversarial real-world sample from
+grammars-v4's own c-testsuite -- no C corpus in `jv_dataset` to use directly):
+
+| Corpus | Pure Python | Native C++ | Speedup |
+|---|---|---|---|
+| Synthetic (70 files) | 3.958 ms/file | 0.539 ms/file | ~7.3x |
+| c-testsuite sample (25 files) | 9.565 ms/file | 1.650 ms/file | ~5.8x |
+
+**Correctness**: 32/32 grammars-v4 example files and 70/70 synthetic corpus
+files parse clean; 22/25 on the adversarial c-testsuite sample (the 3
+failures are macro-token-pasting tricks and a GNU array-range initializer
+outside this grammar's coverage -- see below). Native and pure-Python
+parsers verified byte-identical at every pipeline stage via
+`test/test_native_parsers.py`.
+
+**Two upstream issues patched before shipping** (found during the earlier
+spike, see project history):
+1. The vendored `CLexerBase`/`CParserBase` (both C++ and Python target)
+   defaulted to shelling out to a real `gcc`/invoking `subprocess` on every
+   parse, and the **Python** target read `sys.argv` directly to decide this
+   -- inside csim, `sys.argv` holds csim's own CLI arguments, not anything
+   related to C preprocessing. Patched to default to `--nopp` (skip
+   preprocessing) and to read an explicit, csim-controlled args list
+   instead of `sys.argv`. A production container can't assume gcc/clang is
+   on PATH, and judge submissions have no consistent include paths anyway.
+2. Both targets unconditionally wrote the source text to a `<name>.p` file
+   on disk on every single parse call, even in the (now-default) pass-through
+   case. Removed -- wasted I/O per file and a race condition under
+   concurrent use, for a debug artifact csim has no use for.
+
+**Known limitations**: with preprocessing disabled, `#include`/`#define`/
+etc. lines are swallowed as hidden tokens rather than expanded (the grammar
+has a generic `Directive` rule for this), which means macro-dependent code
+(token-pasting tricks, macros used for control flow) can fail to parse or
+parse differently than a real compiler would see it. Real judge submissions
+essentially never rely on that. Like Kotlin, there is no real-world C corpus
+in this project's benchmark set to tune `csim/c/utils.py`'s normalization
+rules against yet -- treat `group`/`report` results as a reasonable starting
+point, not a tuned config.
+
+**Usage**:
+- `--lang c` for `report`/`group`/`tree`
+- `csim info` reports native parser availability
+- `CSIM_DISABLE_NATIVE=1` forces the pure-Python parser
+
+---
+
+### Fix: wrong terminal text in `csim tree --show-raw` for all native languages
+
+`csim/native/loader.py`'s `_literal_names()` read the generated Lexer class's
+own `literalNames` list to give native-parsed terminals their source text.
+That list turned out to be populated in literal-declaration order, not
+indexed by token type -- e.g. `CPP14Lexer.literalNames[CPP14Lexer.LeftParen]`
+was `"'/'"`, not `"'('"` (ANTLR's own runtime indexes it the same naive way,
+so this is an upstream code-generation quirk affecting every native language
+already shipped: `java_20`, `java_24`, `cpp_14`, `python_3`). Discovered while
+adding Kotlin, whose keywords showed up as unrelated words (`FUN` displayed
+as `'super'`) under `--show-raw`.
+
+**Did not affect correctness of `report`/`group`/similarity scoring** --
+those never read terminal text, only `token.type` (see
+`csim/processing/tree_processing.py`) -- only the cosmetic `--show-raw` tree
+dump was wrong, which nothing in the test suite previously exercised.
+
+Fixed by sourcing literal text from the generated `.tokens` file instead
+(`'<literal>'=<type>` lines), which is correctly keyed by token type. Added
+`test_native_terminal_text_matches_python_when_present` to
+`test/test_native_parsers.py`, parametrized across all native languages, to
+catch a regression here in the future.
+
+### New language: Kotlin (experimental, grammars-v4/kotlin/kotlin)
+
+Added Kotlin as a fully new language to csim -- a pure-Python parser
+(`csim/kotlin/`), a native C++ parser, and the full Normalize/PruneAndHash
+pipeline (`csim/kotlin/utils.py`), unlike the `java_24`/`python_3` additions
+in 3.2.0 which only added a native accelerator next to an *already-existing*
+pure-Python parser. No custom lexer/parser base class was needed for either
+target: this grammar declares no `superClass` at all -- Kotlin's string
+template interpolation is handled entirely through native ANTLR lexer modes.
+
+**Performance** (single cold pass, one process, 70-file synthetic
+judge-style corpus -- see below for why synthetic):
+
+| Parser | Avg/file |
+|---|---|
+| Pure Python (ANTLR Python3 target) | 148.14 ms |
+| Native C++ (ANTLR Cpp target) | 16.69 ms |
+
+**~8.9x speedup.**
+
+**Correctness**: native and pure-Python parsers verified byte-identical at
+every pipeline stage (raw tree, `Normalize`, `PruneAndHash`, similarity
+scores, `group`/`report` CLI output) via `test/test_native_parsers.py`.
+
+**Known limitation -- untuned grouping precision:** unlike every other
+language in csim, there is no real-world Kotlin corpus in this project's
+benchmark set (`jv_dataset` has Java/C++/Python submissions only) to tune or
+validate `csim/kotlin/utils.py`'s normalization rules against. The rules
+follow the same *categories* already validated for other languages
+(structural punctuation excluded, identifier text excluded, import/package
+plumbing collapsed, function/class/property bodies hashed for tree-edit-
+distance tractability) but have not been corpus-measured for false-positive/
+false-negative rates the way `java_24`'s `SYNTHETIC_ASSIGNMENT_EXPR` fix or
+`python_3`'s `relabel_node()` fixes were. Treat `group`/`report` results on
+Kotlin as a reasonable starting point, not a tuned config, until a real
+corpus is available to drive the next pass.
+
+**Usage**:
+- `--lang kotlin` for `report`/`group`/`tree`
+- `csim info` reports native parser availability
+- `CSIM_DISABLE_NATIVE=1` forces the pure-Python parser
+
+---
+
 ## [3.2.0]
 
 ### New: Python 3 native parser (grammars-v4/python/python)

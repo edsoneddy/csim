@@ -127,7 +127,7 @@ The `--threshold` parameter determines how similar files must be to be considere
 
 ## Supported Languages
 
-csim supports five programming language configurations:
+csim supports seven programming language configurations:
 
 ### Python 3.13
 ```bash
@@ -162,6 +162,29 @@ for actual comparisons for now.
 ```bash
 csim report --path ./cpp_files --lang cpp_14
 ```
+
+### Kotlin (experimental — new language, untuned)
+```bash
+csim report --path ./kotlin_files --lang kotlin
+```
+A fully new language for csim, not just a native accelerator for an existing
+one: both the pure-Python parser and a native C++ parser (no base class
+needed) are new. Unlike the other languages here, there's no real Kotlin
+corpus in this project's benchmark set to tune grouping precision against
+yet — treat `group`/`report` results as a reasonable starting point, not a
+tuned config.
+
+### C (experimental — new language, untuned)
+```bash
+csim report --path ./c_files --lang c
+```
+Also a fully new language (pure-Python parser + native C++ parser, this one
+backed by a real symbol table for typedef disambiguation). Always runs with
+preprocessing disabled — `#include`/`#define`/etc. lines are swallowed as
+hidden tokens rather than expanded, so macro-dependent code (token-pasting
+tricks, macros used for control flow) can parse differently than a real
+compiler would see it. Real submissions essentially never rely on that, but
+it's a known limitation. Same "no tuning corpus yet" caveat as Kotlin.
 
 ---
 

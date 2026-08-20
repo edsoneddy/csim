@@ -51,9 +51,22 @@ setup(
     name="csim",
     version="3.2.0",
     packages=find_packages(),
-    # Compiled native parsers, when built (scripts/build_native_parsers.sh).
-    # Absent builds are fine: csim falls back to the pure-Python parsers.
-    package_data={"csim": ["native/lib/*.so", "native/lib/*.dylib", "native/lib/*.dll"]},
+    package_data={
+        # Compiled native parsers, when built (scripts/build_native_parsers.sh).
+        # Absent builds are fine: csim falls back to the pure-Python parsers.
+        "csim": ["native/lib/*.so", "native/lib/*.dylib", "native/lib/*.dll"],
+        # ANTLR's generated `<Lang>Lexer.tokens` file (one per language
+        # package, e.g. csim/java_20/Java20Lexer.tokens) is the only reliable
+        # source for token-type -> literal-text mapping: the generated Lexer
+        # class's own `literalNames` list is populated in literal-declaration
+        # order, not by token type, so csim/native/loader.py's
+        # _literal_names() reads the .tokens file directly instead (see its
+        # docstring). Without this, wheels built before this entry existed
+        # silently shipped without any .tokens files at all -- setuptools
+        # only includes .py files from packages by default -- and every
+        # native-language `csim tree --show-raw` terminal came back as "".
+        "": ["*.tokens"],
+    },
     distclass=BinaryDistribution,
     cmdclass=_cmdclass,
     install_requires=[

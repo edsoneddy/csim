@@ -16,7 +16,7 @@ from csim.python_3.Python3Lexer import Python3Lexer
 from csim.utils import group_by_exhaustive_search, report_pairwise_similarity
 
 
-NATIVE_LANGS = ["java_20", "java_24", "cpp_14", "python_3"]
+NATIVE_LANGS = ["java_20", "java_24", "cpp_14", "python_3", "kotlin", "c"]
 
 
 JAVA_SAMPLES = {
@@ -79,11 +79,78 @@ PYTHON_3_SAMPLES = {
     "compound_assign": "x = 1\nx += 2\nx *= 3\nx -= 1\n",
 }
 
+KOTLIN_SAMPLES = {
+    "simple": "fun main() {\n    val x = 1\n    println(x)\n}\n",
+    "functions": "fun f(a: Int, b: Int): Int {\n    return a + b\n}\n\nfun main() {\n    println(f(1, 2))\n}\n",
+    "control": (
+        "fun f(n: Int): Int {\n    if (n <= 1) return 1\n"
+        "    for (i in 0 until n) { n += i }\n"
+        "    var m = n\n    while (m > 0) { m -= 1 }\n    return m\n}\n"
+    ),
+    "classes": (
+        "class A(val x: Int) {\n    fun get(): Int {\n        return x\n    }\n}\n"
+    ),
+    "lambda_collection": "fun main() {\n    val ys = (1..10).map { it * 2 }\n    println(ys)\n}\n",
+    "compound_assign": "fun main() {\n    var x = 1\n    x += 2\n    x *= 3\n    x -= 1\n}\n",
+}
+
+C_SAMPLES = {
+    "simple": r"""
+        #include <stdio.h>
+        int main(void) {
+            int x = 1;
+            printf("%d\n", x);
+            return 0;
+        }
+    """,
+    "functions": r"""
+        #include <stdio.h>
+        int add(int a, int b) {
+            return a + b;
+        }
+        int main(void) {
+            printf("%d\n", add(1, 2));
+            return 0;
+        }
+    """,
+    "control": r"""
+        int f(int n) {
+            if (n <= 1) return 1;
+            for (int i = 0; i < n; i++) { n += i; }
+            while (n > 0) { n -= 1; }
+            return n;
+        }
+    """,
+    "structs": r"""
+        typedef struct { int x; int y; } Point;
+        int sum(Point p) {
+            return p.x + p.y;
+        }
+    """,
+    "function_pointer": r"""
+        typedef int (*BinOp)(int, int);
+        int apply(BinOp op, int a, int b) {
+            return op(a, b);
+        }
+    """,
+    "compound_assign": r"""
+        int main(void) {
+            int x = 1;
+            x += 2;
+            x *= 3;
+            x -= 1;
+            return x;
+        }
+    """,
+}
+
 SAMPLES_BY_LANG = {
     "java_20": JAVA_SAMPLES,
     "java_24": JAVA_SAMPLES,
     "cpp_14": CPP_SAMPLES,
     "python_3": PYTHON_3_SAMPLES,
+    "kotlin": KOTLIN_SAMPLES,
+    "c": C_SAMPLES,
 }
 
 
@@ -211,6 +278,58 @@ def test_raw_tree_matches_python(lang):
                 if last_native[0] == "terminal" and last_python[0] == "terminal" and eof_vs_line_break:
                     continue
         assert native == python, f"{lang}/{name}: raw tree differs"
+
+
+@pytest.mark.parametrize("lang", NATIVE_LANGS)
+def test_native_terminal_text_matches_python_when_present(lang):
+    """Native terminals must carry either "" or the SAME text as the real
+    ANTLR token at that position.
+
+    Regression test for a bug where csim/native/loader.py's _literal_names()
+    read the generated Lexer class's own `literalNames` list, which turned
+    out to be indexed in literal-declaration order rather than by token
+    type -- e.g. `CPP14Lexer.literalNames[CPP14Lexer.LeftParen]` was `"'/'"`,
+    not `"'('"`. That bug was invisible to every other test here because
+    the actual Normalize/PruneAndHash/similarity pipeline never reads
+    terminal TEXT (only `token.type`, see tree_processing.py) -- only
+    `csim tree --show-raw`, which nothing here previously exercised, showed
+    wrong output. Fixed by sourcing literal text from the generated
+    `.tokens` file instead, which IS correctly keyed by token type.
+
+    Native intentionally reports "" for tokens with no single fixed spelling
+    (identifiers, string/numeric literals, ...) -- see
+    csim/native/tree_builder.py's _terminal_text() -- so this only asserts
+    equality where native actually claims a non-empty literal; "" positions
+    are skipped rather than compared.
+    """
+    from antlr4.tree.Tree import TerminalNode
+
+    def collect_terminal_texts(node):
+        out = []
+
+        def walk(n):
+            if isinstance(n, TerminalNode):
+                out.append(n.getText())
+                return
+            for child in n.getChildren():
+                walk(child)
+
+        walk(node)
+        return out
+
+    for name, code in SAMPLES_BY_LANG[lang].items():
+        native_texts = collect_terminal_texts(_parse_native_only("t", code, lang))
+        python_texts = collect_terminal_texts(_parse_python_only("t", code, lang))
+        assert len(native_texts) == len(python_texts), (
+            f"{lang}/{name}: terminal count differs"
+        )
+        for i, (native_text, python_text) in enumerate(zip(native_texts, python_texts)):
+            if native_text == "":
+                continue
+            assert native_text == python_text, (
+                f"{lang}/{name}: terminal #{i} text differs: "
+                f"native={native_text!r} python={python_text!r}"
+            )
 
 
 @pytest.mark.parametrize("lang", NATIVE_LANGS)

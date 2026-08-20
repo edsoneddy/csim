@@ -7,6 +7,7 @@ reports as unavailable and callers fall back to the pure-Python parsers.
 
 import ctypes
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -20,6 +21,8 @@ _NATIVE_CONFIG = {
     # publishes no C++ target upstream. python_3 (grammars-v4/python/python,
     # the "universal Python 2/3" grammar) is a separate, additional language
     # with its own native parser -- python_3_13 is unaffected and unchanged.
+    "kotlin": ("libkotlin_fast", "parse_kotlin_flat"),
+    "c": ("libc_fast", "parse_c_flat"),
 }
 
 _LIB_DIR = Path(__file__).parent / "lib"
@@ -129,26 +132,81 @@ def native_parse(file_content, lang):
         return None
 
 
+# lang -> (package dir name, Lexer .tokens basename).
+_TOKENS_FILES = {
+    "java_20": ("java_20", "Java20Lexer.tokens"),
+    "java_24": ("java_24", "Java24Lexer.tokens"),
+    "cpp_14": ("cpp_14", "CPP14Lexer.tokens"),
+    "python_3_13": ("python_3_13", "PythonLexer.tokens"),
+    "python_3": ("python_3", "Python3Lexer.tokens"),
+    "kotlin": ("kotlin", "KotlinLexer.tokens"),
+    "c": ("c", "CLexer.tokens"),
+}
+
+# `'<literal>'=<type>` or `NAME=<type>`; only the literal form is of interest
+# here. The literal body may contain backslash-escaped characters (e.g.
+# Kotlin's SINGLE_QUOTE token, `'\''=52`), hence the non-greedy alternation.
+_TOKENS_LINE = re.compile(r"^'((?:[^'\\]|\\.)*)'=(-?\d+)$")
+
+_literal_names_cache = {}
+
+
+def _unescape_literal(text):
+    """Undo ANTLR's `.tokens`-file backslash escaping (`\\'` -> `'`, `\\\\` -> `\\`, ...)."""
+    out = []
+    i = 0
+    while i < len(text):
+        if text[i] == "\\" and i + 1 < len(text):
+            out.append(text[i + 1])
+            i += 2
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
+
+
 def _literal_names(lang):
-    """Lexer literal names for `lang`, used to give terminals their text."""
-    if lang == "java_20":
-        from ..java_20.Java20Lexer import Java20Lexer
+    """Map token type -> unquoted literal text for `lang`'s lexer, used to
+    give fixed-spelling terminals (keywords, punctuation) their source text
+    when rebuilding a tree from the native flat buffer.
 
-        return Java20Lexer.literalNames
-    if lang == "java_24":
-        from ..java_24.Java24Lexer import Java24Lexer
+    Deliberately does NOT read the generated Lexer class's own `literalNames`
+    list: that list is populated in literal-declaration order, not indexed by
+    token type, so `literalNames[token_type]` silently returns the WRONG
+    literal for a real grammar (confirmed on both CPP14Lexer and KotlinLexer
+    -- e.g. `CPP14Lexer.literalNames[CPP14Lexer.LeftParen]` is `"'/'"`, not
+    `"'('"`). ANTLR's own runtime indexes it the same naive way (see
+    antlr4/IntervalSet.py's elementName()), so this is an upstream
+    code-generation quirk, not something introduced here.
 
-        return Java24Lexer.literalNames
-    if lang == "cpp_14":
-        from ..cpp_14.CPP14Lexer import CPP14Lexer
+    The generated `.tokens` file (`'<literal>'=<type>` / `NAME=<type>` lines,
+    one per token) IS correctly keyed by the real token type -- confirmed
+    against the same two lexers above -- so it's used as the source of truth
+    instead. Parsed once per language and cached.
+    """
+    if lang in _literal_names_cache:
+        return _literal_names_cache[lang]
 
-        return CPP14Lexer.literalNames
-    if lang == "python_3_13":
-        from ..python_3_13.PythonLexer import PythonLexer
+    config = _TOKENS_FILES.get(lang)
+    if config is None:
+        _literal_names_cache[lang] = None
+        return None
 
-        return PythonLexer.literalNames
-    if lang == "python_3":
-        from ..python_3.Python3Lexer import Python3Lexer
+    package_dir, basename = config
+    path = Path(__file__).parent.parent / package_dir / basename
 
-        return Python3Lexer.literalNames
-    return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        _literal_names_cache[lang] = None
+        return None
+
+    literals = {}
+    for line in text.splitlines():
+        match = _TOKENS_LINE.match(line)
+        if match:
+            literal, token_type = match.groups()
+            literals[int(token_type)] = _unescape_literal(literal)
+
+    _literal_names_cache[lang] = literals
+    return literals

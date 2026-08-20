@@ -34,6 +34,12 @@ def get_rule_names(lang):
     elif lang == "python_3":
         from .python_3.Python3Parser import Python3Parser
         return Python3Parser.ruleNames
+    elif lang == "kotlin":
+        from .kotlin.KotlinParser import KotlinParser
+        return KotlinParser.ruleNames
+    elif lang == "c":
+        from .c.CParser import CParser
+        return CParser.ruleNames
     else:
         return None
 
@@ -62,6 +68,12 @@ def get_symbolic_names(lang):
     elif lang == "python_3":
         from .python_3.Python3Lexer import Python3Lexer
         return Python3Lexer.symbolicNames
+    elif lang == "kotlin":
+        from .kotlin.KotlinLexer import KotlinLexer
+        return KotlinLexer.symbolicNames
+    elif lang == "c":
+        from .c.CLexer import CLexer
+        return CLexer.symbolicNames
     else:
         return None
 
@@ -178,6 +190,10 @@ def get_extension_by_lang(lang):
         return ".cpp"
     elif lang == "python_3":
         return ".py"
+    elif lang == "kotlin":
+        return ".kt"
+    elif lang == "c":
+        return ".c"
     else:
         raise ValueError(f"Unsupported language: {lang}")
 
@@ -233,6 +249,14 @@ def get_excluded_token_types(lang):
         from .python_3.utils import EXCLUDED_TOKEN_TYPES as python_3_excluded
 
         return python_3_excluded
+    elif lang == "kotlin":
+        from .kotlin.utils import EXCLUDED_TOKEN_TYPES as kotlin_excluded
+
+        return kotlin_excluded
+    elif lang == "c":
+        from .c.utils import EXCLUDED_TOKEN_TYPES as c_excluded
+
+        return c_excluded
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -265,6 +289,14 @@ def get_excluded_rule_types(lang):
         from .python_3.utils import EXCLUDED_RULE_TYPES as python_3_excluded
 
         return python_3_excluded
+    elif lang == "kotlin":
+        from .kotlin.utils import EXCLUDED_RULE_TYPES as kotlin_excluded
+
+        return kotlin_excluded
+    elif lang == "c":
+        from .c.utils import EXCLUDED_RULE_TYPES as c_excluded
+
+        return c_excluded
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -290,6 +322,12 @@ def get_hash_rule_indices(lang):
     if lang == "python_3":
         from .python_3.utils import HASHED_RULE_INDICES as python_3_hashed_rules
         return python_3_hashed_rules
+    if lang == "kotlin":
+        from .kotlin.utils import HASHED_RULE_INDICES as kotlin_hashed_rules
+        return kotlin_hashed_rules
+    if lang == "c":
+        from .c.utils import HASHED_RULE_INDICES as c_hashed_rules
+        return c_hashed_rules
     else:
         return set()  # Default to empty set for unsupported languages
 
@@ -358,6 +396,16 @@ def get_exclude_childrens_from_rule(lang):
             EXCLUDE_CHILDRENS_FROM_RULE as python_3_exclude_childrens_from_rule,
         )
         return python_3_exclude_childrens_from_rule
+    if lang == "kotlin":
+        from .kotlin.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as kotlin_exclude_childrens_from_rule,
+        )
+        return kotlin_exclude_childrens_from_rule
+    if lang == "c":
+        from .c.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as c_exclude_childrens_from_rule,
+        )
+        return c_exclude_childrens_from_rule
     else:
         return dict()  # Default to empty dict for unsupported languages
 
@@ -396,6 +444,16 @@ def get_control_equivalence_rule_indices(lang):
             CONTROL_EQUIVALENCE_RULE_INDICES as python_3_control_equivalence_rules,
         )
         return python_3_control_equivalence_rules
+    if lang == "kotlin":
+        from .kotlin.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as kotlin_control_equivalence_rules,
+        )
+        return kotlin_control_equivalence_rules
+    if lang == "c":
+        from .c.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as c_control_equivalence_rules,
+        )
+        return c_control_equivalence_rules
     else:
         return dict()  # Default to empty dict for unsupported languages
 

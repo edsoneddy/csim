@@ -5,6 +5,7 @@ from .language.parser import ANTLR_parse
 from .processing.tree_processing import Normalize, PruneAndHash
 from .utils import (
     group_by_exhaustive_search,
+    count_antlr_tree_nodes,
     print_antlr_tree,
     print_tree,
     process_files,
@@ -77,7 +78,7 @@ def main():
         if args.show_raw:
             print("=== Raw ANTLR Parse Tree ===")
             print_antlr_tree(raw_tree, tree_lang)
-            print()
+            print("\nTotal nodes in raw tree:", count_antlr_tree_nodes(raw_tree))
 
         normalized_tree = Normalize(raw_tree, tree_lang)
         pruned_tree, node_count = PruneAndHash(normalized_tree, tree_lang)

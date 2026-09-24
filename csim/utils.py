@@ -92,6 +92,18 @@ def print_antlr_tree(node, lang, indent=0):
     _print(node, indent)
 
 
+def count_antlr_tree_nodes(node):
+    """Return the number of rule and terminal nodes in an ANTLR tree."""
+    if node is None:
+        return 0
+    from antlr4 import TerminalNode
+
+    if isinstance(node, TerminalNode):
+        return 1
+
+    return 1 + sum(count_antlr_tree_nodes(child) for child in node.getChildren())
+
+
 def get_file(file_path):
     if not Path(file_path).is_file():
         raise argparse.ArgumentTypeError(f"File '{file_path}' does not exist.")

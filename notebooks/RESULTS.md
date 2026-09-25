@@ -11,11 +11,25 @@ Sample: **1000 programs** from `all_py` (296 problems pooled), duplicate-free (s
 | `python_3_13` | 1000 | 1127 / 965 / 2067 / 3877 | 28.7 / 25 / 52 / 104 | 97.4% (x39.2) | x38.2 | 1 |
 | `python_3` | 1000 | 654 / 574 / 1206 / 1890 | 32.7 / 28 / 61 / 141 | 95.0% (x20.0) | x20.2 | 1 |
 
-Figures (from `nodes_reduction/nodes_reduction.ipynb`): `nodes_reduction/results/nodes_reduction_python_3_13.png`, `nodes_reduction_python_3.png`, `nodes_survival_python.png`.
+Figures come from `nodes_reduction/nodes_reduction.ipynb`, one image per chart in `nodes_reduction/results/`. Per grammar: distribution on a log scale, distribution on the real node count, and a per-program scatter (before vs. after).
 
-![python_3_13](nodes_reduction/results/nodes_reduction_python_3_13.png)
+### `python_3_13`
 
-![python_3](nodes_reduction/results/nodes_reduction_python_3.png)
+![log scale](nodes_reduction/results/nodes_hist_log_python_3_13.png)
+
+![real scale](nodes_reduction/results/nodes_hist_real_python_3_13.png)
+
+![scatter](nodes_reduction/results/nodes_scatter_python_3_13.png)
+
+### `python_3`
+
+![log scale](nodes_reduction/results/nodes_hist_log_python_3.png)
+
+![real scale](nodes_reduction/results/nodes_hist_real_python_3.png)
+
+![scatter](nodes_reduction/results/nodes_scatter_python_3.png)
+
+### Both grammars
 
 ![survival](nodes_reduction/results/nodes_survival_python.png)
 

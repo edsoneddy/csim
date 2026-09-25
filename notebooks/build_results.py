@@ -56,13 +56,24 @@ def nodes_section():
         )
     lines += [
         "",
-        "Figures (from `nodes_reduction/nodes_reduction.ipynb`): "
-        "`nodes_reduction/results/nodes_reduction_python_3_13.png`, "
-        "`nodes_reduction_python_3.png`, `nodes_survival_python.png`.",
+        "Figures come from `nodes_reduction/nodes_reduction.ipynb`, one image per chart in "
+        "`nodes_reduction/results/`. Per grammar: distribution on a log scale, distribution on the real node "
+        "count, and a per-program scatter (before vs. after).",
         "",
-        "![python_3_13](nodes_reduction/results/nodes_reduction_python_3_13.png)",
-        "",
-        "![python_3](nodes_reduction/results/nodes_reduction_python_3.png)",
+    ]
+    for lang in LANGS:
+        lines += [
+            f"### `{lang}`",
+            "",
+            f"![log scale](nodes_reduction/results/nodes_hist_log_{lang}.png)",
+            "",
+            f"![real scale](nodes_reduction/results/nodes_hist_real_{lang}.png)",
+            "",
+            f"![scatter](nodes_reduction/results/nodes_scatter_{lang}.png)",
+            "",
+        ]
+    lines += [
+        "### Both grammars",
         "",
         "![survival](nodes_reduction/results/nodes_survival_python.png)",
         "",

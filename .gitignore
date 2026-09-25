@@ -23,7 +23,12 @@ __pycache__/
 # Python egg and build files
 *.egg-info
 
-# Testing grammar files
-test
-
 notebooks/datasets
+
+snippet_bank/
+# Local dev helpers (benchmarks, CI reproduction) - not part of the package
+/utils
+
+# Compiled native parsers: build artifacts, rebuilt per platform by CI or
+# locally with scripts/build_native_parsers.sh
+csim/native/lib/

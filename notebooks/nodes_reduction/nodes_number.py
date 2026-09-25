@@ -1,49 +1,57 @@
 """
-Generates prev_nodes_number.txt and post_nodes_number.txt for nodes_reduction.ipynb.
+Counts nodes before and after pruning for the programs picked by select_files.py.
 
-For every source file of a dataset directory it calls `csim.count_nodes`, which returns
+For every file listed in results/selected_<dataset>.csv it calls `csim.count_nodes`, which returns
 (nodes_before, nodes_after):
 
-* prev_nodes_number.txt -- nodes of the raw ANTLR parse tree (every rule and token node).
-* post_nodes_number.txt -- nodes of the normalized, pruned and hashed tree that is handed to
-  the tree edit distance (what `csim tree` prints as "Total nodes after pruning").
+* nodes_before -- every node of the raw ANTLR parse tree (rules and tokens).
+* nodes_after  -- the normalized, pruned and hashed tree handed to the tree edit distance
+                  (what `csim tree` prints as "Total nodes after pruning").
+
+Writes results/nodes_<lang>.csv (dataset,problem,file,lines,before,after).
 
 Usage:
-    python nodes_number.py [dataset_dir] [lang]
+    python nodes_number.py [dataset_root] [lang ...]
 
-Defaults: ../datasets/large, python_3_13. Files that fail to parse are skipped.
+dataset_root defaults to ../../../jv-umsa-dataset (the folder holding all_py).
+With no language, both Python grammars are processed.
 """
 
-from pathlib import Path
+import csv
 import sys
+from pathlib import Path
 
 from csim import count_nodes
-from csim.utils import get_extension_by_lang, read_file
 
-path = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).parent / "../datasets/large")
-lang = sys.argv[2] if len(sys.argv) > 2 else "python_3_13"
-directory = Path(path)
+HERE = Path(__file__).parent
+LANGS = {  # lang -> dataset folder (the analysis is Python-only)
+    "python_3_13": "all_py",
+    "python_3": "all_py",
+}
 
-if not directory.is_dir():
-    raise ValueError(f"Error: {path} is not a directory")
+root = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "../../../jv-umsa-dataset"
+wanted = sys.argv[2:] or list(LANGS)
 
-extension = get_extension_by_lang(lang)
-before, after = [], []
-for p in sorted(directory.iterdir()):
-    if not (p.is_file() and p.name.endswith(extension)):
+for lang in wanted:
+    dataset = LANGS[lang]
+    selected = HERE / "results" / f"selected_{dataset}.csv"
+    if not selected.exists():
+        print(f"skip {lang}: {selected.name} not found (run select_files.py first)")
         continue
-    file_name, content = read_file(str(p))
-    if content is None:
-        continue
-    try:
-        b, a = count_nodes(file_name, content, lang)
-    except Exception as e:
-        print(f"Error {p.name}: {e}", file=sys.stderr)
-        continue
-    before.append(b)
-    after.append(a)
-
-out = Path(__file__).parent
-(out / "prev_nodes_number.txt").write_text(str(before) + "\n")
-(out / "post_nodes_number.txt").write_text(str(after) + "\n")
-print(f"{len(after)} files ({lang}) -> prev_nodes_number.txt / post_nodes_number.txt")
+    rows, skipped = [], 0
+    with open(selected, newline="") as fh:
+        for r in csv.DictReader(fh):
+            path = root / dataset / r["problem"] / r["file"]
+            try:
+                before, after = count_nodes(str(path), path.read_text(encoding="utf-8"), lang)
+            except Exception as e:  # a grammar may reject what another accepted
+                print(f"  {lang}: {path.name}: {e}", file=sys.stderr)
+                skipped += 1
+                continue
+            rows.append((dataset, r["problem"], r["file"], r["lines"], before, after))
+    out = HERE / "results" / f"nodes_{lang}.csv"
+    with open(out, "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["dataset", "problem", "file", "lines", "before", "after"])
+        w.writerows(rows)
+    print(f"{lang}: {len(rows)} files ({skipped} skipped) -> {out.name}")

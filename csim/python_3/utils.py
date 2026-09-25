@@ -40,27 +40,14 @@ def relabel_node(node):
 
     compound_stmt's SIX labeled alternatives (#if_stmt, #while_stmt,
     #for_stmt, #with_stmt, #try_stmt, #class_or_func_def_stmt) all share
-    RULE_compound_stmt. Hashing compound_stmt wholesale (needed for tree
-    size) makes distance_metrics.py's label_distance() give a `for` vs
-    `while` swap only 0.5 cost ("same rule, different hash" -- SAME
-    ruleIndex, since both are compound_stmt) instead of the 1.0 cost
-    python_3_13 assigns (for_stmt and while_stmt are genuinely separate,
-    unshared rules there, so they always fully mismatch). This under-
-    penalizes a real control-flow difference. Giving each alternative its
-    OWN synthetic id before hashing restores that distinction: two `for`
-    loops still compare as "same rule, hash of content" (0.0 or 0.5
-    depending on content), but a `for` vs a `while` now correctly costs 1.0,
-    matching python_3_13. Measured: files 132244.py/789477.py in
-    jv_dataset/all_py/1006 (296 files) differ mainly in loop kind (`for` vs
-    `while`) and scored 0.67 (python_3_13, correctly separate) vs. 0.83
-    (python_3 pre-fix, incorrectly merged) -- found via the 296-file corpus
-    after the 67-file corpus showed zero remaining threshold-crossing pairs,
-    a reminder that one corpus sample doesn't cover every construct.
-    if/while/for/with/class_or_func_def route to HASHED_RULE_INDICES (their
-    content still matters, same reasoning as `expr`/`comparison`/
-    `logical_test`); try_stmt keeps routing to EXCLUDED_RULE_TYPES per the
-    original try/except fix (python_3_13 drops that content entirely, it
-    doesn't leave a marker behind either).
+    RULE_compound_stmt, so each gets its own synthetic id here. Without it a
+    `for` vs `while` swap would look like the same construct.
+    None of the compound alternatives is hashed or excluded any more (see
+    HASHED_RULE_INDICES): the synthetic ids only keep each construct's
+    identity distinct, so a `for` vs a `while` still costs a full mismatch
+    while their bodies stay as real, comparable subtrees. try/except is kept
+    for the same reason (measured: keeping it lowers the error vs. the
+    unpruned tree on both the tuning and validation problem sets).
     """
     rule_index = node.getRuleIndex()
     if rule_index == Python3Parser.RULE_small_stmt:
@@ -131,27 +118,12 @@ def relabel_node(node):
 # measured as real failures during java_24's tuning (see
 # csim_native_parsers project memory).
 #
-# Status (jv_dataset/all_py, grouping compared against python_3_13 pairwise
-# for every file, threshold 0.8):
-#   - all_py/1050 (67 files, 2211 pairs):  0 threshold-crossing pairs.
-#     `csim group` output is byte-for-byte identical to python_3_13's.
-#   - all_py/1006 (296 files):             0 threshold-crossing pairs.
-#     `csim group` output is byte-for-byte identical to python_3_13's.
-#   - all_py/1039 (91 files):              26 threshold-crossing pairs
-#     remain, all python_3 scoring HIGHER than python_3_13. Root cause: for
-#     files with few top-level statements, python_3's tree ends up SMALLER/
-#     coarser overall than python_3_13's for the same source (e.g. 5 nodes
-#     vs. python_3_13's 8-9 for the same two-function file) even though
-#     each individual hash/exclude/collapse decision made here is
-#     individually correct -- SimilarityIndex's TED-based formula is
-#     sensitive to overall tree size, so a smaller tree makes any single
-#     matching subtree (e.g. a boilerplate `if __name__ == "__main__":`
-#     block) count for proportionally more of the total similarity. Fixing
-#     this needs understanding why python_3_13 stays more granular at the
-#     top-level-statement level specifically -- a new investigation, not an
-#     extension of the assignment/try-except/loop-kind fixes above (see
-#     relabel_node() and the other tables' comments for those). Left as a
-#     known limitation rather than guessed at further.
+# Status: pruning fidelity is measured against the unpruned tree, not against
+# python_3_13's output. On 2 disjoint sets of 12 jv-umsa-dataset/all_py
+# problems (1440 pairs each), the similarity index of the pruned trees differs
+# from the unpruned one by a mean of ~0.09 (vs. ~0.15 before compound
+# statements stopped being hashed) at ~5x node compression -- see
+# docs/pruning_fidelity.md for method and numbers.
 
 EXCLUDED_TOKEN_TYPES = {
     # Structural / whitespace / comment tokens.
@@ -239,33 +211,15 @@ HASHED_RULE_INDICES = {
     Python3Parser.RULE_comparison,
     Python3Parser.RULE_logical_test,
     Python3Parser.RULE_small_stmt,
-    # Body-wrapping alternatives of `compound_stmt`. Unlike java_24's
-    # rejected COLLAPSED experiment on a hub rule (which discarded content
-    # entirely, making different constructs indistinguishable), HASHING
-    # preserves a content-derived digest -- an `if` and a `while` still get
-    # different digests since their content differs, so this doesn't
-    # reintroduce that failure mode.
-    #
-    # Each alternative gets its OWN synthetic id via relabel_node() above
-    # instead of hashing RULE_compound_stmt directly: `compound_stmt` itself
-    # would give every alternative the SAME rule label, and
-    # distance_metrics.py's label_distance() gives "same rule, different
-    # hash" only 0.5 cost -- meaning a `for`-vs-`while` swap would cost half
-    # what python_3_13 charges (for_stmt/while_stmt are genuinely separate,
-    # unshared rules there, so they mismatch fully at 1.0). Measured: fixed
-    # files 132244.py/789477.py in jv_dataset/all_py/1006 (296 files),
-    # which differ mainly in loop kind and incorrectly scored 0.83 (merged)
-    # instead of python_3_13's 0.67 (separate) before this. `funcdef`/
-    # `classdef` are separate, non-shared rules already covered by
-    # SYNTHETIC_CLASS_OR_FUNC_STMT above; listed too in case a future change
-    # stops routing through the synthetic id.
-    SYNTHETIC_IF_STMT,
-    SYNTHETIC_WHILE_STMT,
-    SYNTHETIC_FOR_STMT,
-    SYNTHETIC_WITH_STMT,
-    SYNTHETIC_CLASS_OR_FUNC_STMT,
-    Python3Parser.RULE_funcdef,
-    Python3Parser.RULE_classdef,
+    # Compound statements (if/while/for/with/def/class) are deliberately NOT
+    # hashed: their body is the program's control-flow skeleton, and hashing
+    # them turned whole programs into 1-5 nodes (median 24x compression,
+    # mean |error| of 0.14-0.16 in the similarity index vs. the unpruned
+    # tree; see docs/pruning_fidelity.md). Only their leaves (expressions and
+    # simple statements above) are hashed, which keeps ~5x compression at
+    # roughly half that error. relabel_node() still gives each alternative
+    # its own synthetic rule id so `for` vs `while` stay distinguishable
+    # without hashing anything.
 }
 
 CONTROL_EQUIVALENCE_RULE_INDICES = set()
@@ -278,11 +232,4 @@ EXCLUDED_RULE_TYPES = {
     # Identifier nodes: which name was chosen doesn't reflect an
     # algorithmic difference.
     Python3Parser.RULE_name,
-    # Engine-assisted: see relabel_node() above. Not a real grammar rule --
-    # a synthetic id assigned to try-shaped `compound_stmt` nodes, so this
-    # entry can drop the whole try/except/finally structure the same way
-    # python_3_13 drops it via its separate try_stmt/except_block/
-    # finally_block/else_block entries, instead of it falling under
-    # compound_stmt's wholesale hash below.
-    SYNTHETIC_TRY_STMT,
 }

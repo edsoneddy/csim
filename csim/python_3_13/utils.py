@@ -127,17 +127,12 @@ HASHED_RULE_INDICES = {
     # del_targets / del_target
     PythonParser.RULE_del_targets,
     PythonParser.RULE_del_target,
-    # Body-wrapping rules: content-based hash preserves genuine differences
-    # between two classes/functions/branches while collapsing the noisy
-    # internal structure to a single node. csim-batch-tuner sweep,
-    # scripts/report.md, verified collision-free in combination.
-    PythonParser.RULE_class_def_raw,
-    PythonParser.RULE_function_def,
-    PythonParser.RULE_function_def_raw,
-    PythonParser.RULE_if_stmt,
-    PythonParser.RULE_while_stmt,
-    PythonParser.RULE_for_stmt,
-    PythonParser.RULE_with_stmt,
+    # Body-wrapping rules (class_def_raw, function_def[_raw], if/while/for/
+    # with_stmt) are deliberately NOT hashed: they are the program's
+    # control-flow skeleton, and hashing them collapsed whole programs to
+    # 1-5 nodes (median ~30x compression, mean |error| 0.14-0.18 in the
+    # similarity index vs. the unpruned tree). Leaves stay hashed: ~6x
+    # compression at ~half the error. See docs/pruning_fidelity.md.
 }
 CONTROL_EQUIVALENCE_RULE_INDICES = {}
 RULE_ASSIGNMENT = PythonParser.RULE_assignment
@@ -198,9 +193,6 @@ ASIGN_OP_NORMALIZED = {
 EXCLUDED_RULE_TYPES = {
     PythonParser.RULE_name,
     PythonParser.RULE_name_except_underscore,
-    PythonParser.RULE_raise_stmt,
-    PythonParser.RULE_assert_stmt,
-    # raise_stmt/assert_stmt wrap
     PythonParser.RULE_subject_expr,
     PythonParser.RULE_guard,
     PythonParser.RULE_patterns,
@@ -235,11 +227,4 @@ EXCLUDED_RULE_TYPES = {
     # collided when combined with the rest. See the audit method note at
     # the end of this file.
     PythonParser.RULE_default_assignment,
-    PythonParser.RULE_elif_stmt,
-    PythonParser.RULE_else_block,
-    PythonParser.RULE_with_item,
-    PythonParser.RULE_try_stmt,
-    PythonParser.RULE_except_block,
-    PythonParser.RULE_except_star_block,
-    PythonParser.RULE_finally_block,
 }

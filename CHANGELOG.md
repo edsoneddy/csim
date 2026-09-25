@@ -3,6 +3,19 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+## [Unreleased]
+
+### Less aggressive pruning for `python_3` and `python_3_13`
+
+Compound statements (`if`/`while`/`for`/`with`/`def`/`class`) are no longer
+hashed, and `try/except/finally`, `elif`/`else` (and `raise`/`assert`/
+`with_item` in `python_3_13`) are no longer excluded. Previously a program
+that was a single loop became one node (median compression ~30x). Measured on
+3 disjoint sets of 12 real `all_py` problems, the mean error of the similarity
+index vs. the unpruned tree drops from ~0.14-0.18 to ~0.08-0.09 at ~5-6x
+compression. Similarity scores change accordingly (e.g. `for` vs `while`
+0.83 -> 0.56-0.60). Method and numbers: `docs/pruning_fidelity.md`.
+
 ## [3.3.0]
 
 ### New language: C (experimental, grammars-v4/c)

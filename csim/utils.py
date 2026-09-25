@@ -78,7 +78,18 @@ def get_symbolic_names(lang):
         return None
 
 
-def format_label(label, rule_names=None, symbolic_names=None):
+def get_synthetic_names(lang):
+    """Names of the synthetic rule ids a language's relabel_node() can emit
+    (e.g. python_3's 202 -> "if_stmt"), so printed trees read as words."""
+    import importlib
+
+    if lang not in ("python_3", "java_24"):
+        return {}
+    module = importlib.import_module(f".{lang}.utils", package=__package__)
+    return getattr(module, "SYNTHETIC_NAMES", {})
+
+
+def format_label(label, rule_names=None, symbolic_names=None, synthetic_names=None):
     """Resolve a normalized-tree label to a human-readable string.
 
     A label is either a rule index (int), a token type offset by
@@ -96,7 +107,9 @@ def format_label(label, rule_names=None, symbolic_names=None):
     if isinstance(label, str):
         if "|" in label:
             prefix, digest = label.split("|", 1)
-            if rule_names and prefix.isdigit() and int(prefix) < len(rule_names):
+            if synthetic_names and prefix.isdigit() and int(prefix) in synthetic_names:
+                prefix = synthetic_names[int(prefix)]
+            elif rule_names and prefix.isdigit() and int(prefix) < len(rule_names):
                 prefix = rule_names[int(prefix)]
             return f"{prefix} [hashed:{digest[:8]}]"
         return label
@@ -106,6 +119,8 @@ def format_label(label, rule_names=None, symbolic_names=None):
             if symbolic_names and 0 <= token_type < len(symbolic_names):
                 return symbolic_names[token_type]
             return f"TOKEN<{token_type}>"
+        if synthetic_names and label in synthetic_names:
+            return synthetic_names[label]
         if rule_names and 0 <= label < len(rule_names):
             return rule_names[label]
     return str(label)
@@ -124,9 +139,10 @@ def print_tree(node, indent=0, lang=None):
 
     rule_names = get_rule_names(lang) if lang else None
     symbolic_names = get_symbolic_names(lang) if lang else None
+    synthetic_names = get_synthetic_names(lang) if lang else None
 
     def _print(n, depth):
-        print("   " * depth + format_label(n["label"], rule_names, symbolic_names))
+        print("   " * depth + format_label(n["label"], rule_names, symbolic_names, synthetic_names))
         for child in n["children"]:
             _print(child, depth + 1)
 
@@ -360,6 +376,27 @@ def get_relabel_fn(lang):
         from .python_3.utils import relabel_node
         return relabel_node
     return None
+
+
+def get_structural_rule_indices(lang):
+    """Retrieve the rules that mark a subtree as structural (control flow,
+    bodies, declarations of callables/types) for a language.
+
+    A rule in HASHED_RULE_INDICES is only collapsed to a digest when its
+    subtree contains none of these, so hashing can compress expressions and
+    simple statements without ever flattening the program's skeleton.
+
+    Returns:
+        set: Rule indices (or synthetic ids); empty when a language declares none.
+    """
+    import importlib
+
+    if lang not in (
+        "python_3_13", "python_3", "java_20", "java_24", "cpp_14", "kotlin", "c",
+    ):
+        return set()
+    module = importlib.import_module(f".{lang}.utils", package=__package__)
+    return getattr(module, "STRUCTURAL_RULE_INDICES", set())
 
 
 def get_exclude_childrens_from_rule(lang):

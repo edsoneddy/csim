@@ -15,6 +15,22 @@ that was a single loop became one node (median compression ~30x). Measured on
 index vs. the unpruned tree drops from ~0.14-0.18 to ~0.08-0.09 at ~6-7x
 compression. Method and numbers: `docs/pruning_fidelity.md`.
 
+### Same policy for Java 20/24, C++14, C and Kotlin
+
+Only expression/declaration "islands" are hashed now (new optional
+`STRUCTURAL_RULE_INDICES` in each language's `utils.py`: a hashed rule that
+contains control flow, e.g. a lambda with a block body, is not collapsed).
+Previously Java 20 collapsed 93% of real files to a single node, java_24 and
+cpp_14 to a median of 8 and 3 nodes, and those configs scored 34-40% of
+*unrelated* submission pairs as >= 0.7 similar (0% on the unpruned tree). Now:
+mean index error vs. the unpruned tree 0.06-0.12 at 5.5-9.5x compression and
+0-0.2% false similarity. Assignments, `if`/`for`/`switch`/`throw`/`catch`,
+declarations and types are no longer dropped wholesale. New: `for`/`while`
+equivalence (`LOOP`) in every language; `x op= y` == `x = x op y` in every
+language (also on the native path); modifier rules excluded in java_24;
+built-in type keywords excluded in C/C++. Full table: `docs/pruning_fidelity.md`.
+`csim tree` now prints readable names for synthetic ids (`if_stmt`, ...).
+
 ### Fixed: augmented assignment normalization (`x += y` vs `x = x + y`)
 
 The rewrite in `python_3_13` built a tree of a different shape than the
@@ -24,7 +40,7 @@ equal. It now re-emits the target as its right-hand-side twin (`atom`, or the
 `primary` chain for `a[i]` / `self.x`) and adds the `star_targets` child.
 `python_3` had no rewrite at all; it now gets the same one (done in `visit()`,
 so the native parser path sees it too). Covered for all 13 operators plus
-subscript/attribute targets in `test/test_augmented_assignment.py`.
+subscript/attribute targets in regression tests.
 
 ### Fixed: `python_3` lexer crash on trailing whitespace at EOF
 
@@ -37,7 +53,7 @@ needs a native rebuild to take effect).
 
 Both loop kinds share the `LOOP` label again (`CONTROL_EQUIVALENCE_RULE_INDICES`),
 and the loop variable / `for`/`while`/`in` keywords no longer add a node. On
-the hand-made clone set (`test/controlled`, 36 all-vs-all pairs, all clones)
+the hand-made clone set (`jv-umsa-dataset/controlled`, 36 all-vs-all pairs, all clones)
 36 -> 35 (`python_3`) and 34 (`python_3_13`) pairs score >= 0.7, 2.0.0: 34.
 `python_3` also drops the `def`/`class` keywords and hashes `def_parameters`,
 as `python_3_13` already did. Trade-off: `for` vs `while` no longer costs a

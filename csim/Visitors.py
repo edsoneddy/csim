@@ -2,13 +2,25 @@ from .python_3_13.PythonParserVisitor import PythonParserVisitor
 from .python_3_13.PythonParser import PythonParser
 from .utils import TOKEN_TYPE_OFFSET
 from .java_20.Java20ParserVisitor import Java20ParserVisitor
+from .java_20.Java20Lexer import Java20Lexer
+from .java_20.Java20Parser import Java20Parser
 from .java_24.Java24ParserVisitor import Java24ParserVisitor
+from .java_24.Java24Lexer import Java24Lexer
+from .java_24.Java24Parser import Java24Parser
 from .cpp_14.CPP14ParserVisitor import CPP14ParserVisitor
+from .cpp_14.CPP14Lexer import CPP14Lexer
+from .cpp_14.CPP14Parser import CPP14Parser
 from .python_3.Python3ParserVisitor import Python3ParserVisitor
 from .kotlin.KotlinParserVisitor import KotlinParserVisitor
+from .kotlin.KotlinLexer import KotlinLexer
+from .kotlin.KotlinParser import KotlinParser
 from .c.CParserVisitor import CParserVisitor
+from .c.CLexer import CLexer
+from .c.CParser import CParser
 from antlr4 import TerminalNode
 from .java_20.utils import (
+    AUG_ASSIGN_OPS as JAVA_20_AUG_ASSIGN_OPS,
+    TARGET_AS_OPERAND as JAVA_20_TARGET_AS_OPERAND,
     COLLAPSED_RULE_INDICES as JAVA_20_COLLAPSED_RULES,
     ASIGN_OP_NORMALIZED as JAVA_20_ASSIGN_OP_NORMALIZED,
     RULE_ASSIGNMENT as JAVA_20_RULE_ASSIGNMENT,
@@ -16,6 +28,9 @@ from .java_20.utils import (
 try:
     from .java_24.utils import (
         COLLAPSED_RULE_INDICES as JAVA_24_COLLAPSED_RULES,
+        AUG_ASSIGN_OPS as JAVA_24_AUG_ASSIGN_OPS,
+        relabel_node as java_24_relabel_node,
+        SYNTHETIC_ASSIGNMENT_EXPR as JAVA_24_SYNTHETIC_ASSIGNMENT_EXPR,
         ASIGN_OP_NORMALIZED as JAVA_24_ASSIGN_OP_NORMALIZED,
         RULE_ASSIGNMENT as JAVA_24_RULE_ASSIGNMENT,
     )
@@ -38,14 +53,18 @@ from .python_3.utils import (
 )
 from .python_3.Python3Parser import Python3Parser
 from .cpp_14.utils import (
+    AUG_ASSIGN_OPS as CPP_14_AUG_ASSIGN_OPS,
+    DECLARATOR_AS_OPERAND as CPP_14_DECLARATOR_AS_OPERAND,
     COLLAPSED_RULE_INDICES as CPP_14_COLLAPSED_RULES,
     ASIGN_OP_NORMALIZED as CPP_14_ASSIGN_OP_NORMALIZED,
     RULE_ASSIGNMENT as CPP_14_RULE_ASSIGNMENT,
 )
 from .kotlin.utils import (
+    AUG_ASSIGN_OPS as KOTLIN_AUG_ASSIGN_OPS,
     COLLAPSED_RULE_INDICES as KOTLIN_COLLAPSED_RULES,
 )
 from .c.utils import (
+    AUG_ASSIGN_OPS as C_AUG_ASSIGN_OPS,
     COLLAPSED_RULE_INDICES as C_COLLAPSED_RULES,
 )
 
@@ -160,58 +179,86 @@ class Java20ParserVisitorExtended(Java20ParserVisitor):
         return tree.accept(self)
 
     def visitAssignment(self, node):
-        """Rewrite assignment nodes to a normalized form based on the operator used.
-        This allows different forms of the same underlying operation to be treated as equivalent in similarity comparisons.
-        e.g., "x += 1" and "x = x + 1" would both be normalized to a common representation, improving the accuracy of similarity detection.
+        """Rebuild `x op= y` as the tree of `x = x op y` (same rules, same
+        children), so both hash identically. A plain `=` is visited as usual.
+
+        Token types only (native terminals carry no text). The assignment
+        operator is a rule wrapping one token; shift compound operators are
+        not in AUG_ASSIGN_OPS and fall through unchanged.
         """
-        operand = node.getChild(1).getText()
-        if operand in JAVA_20_ASSIGN_OP_NORMALIZED:
-            # Rewrite the assignment to a normalized form based on the operator
-            rule, operator_token = JAVA_20_ASSIGN_OP_NORMALIZED[operand]
-            assignment_node = {"label": JAVA_20_RULE_ASSIGNMENT, "children": []}
-            norm_node = {"label": rule, "children": []}
-            norm_node["children"].append(self.visit(node.getChild(0)))
-            norm_node["children"].append({"label": operator_token, "children": []})
-            norm_node["children"].append(self.visit(node.getChild(2)))
-            assignment_node["children"].append(norm_node)
-            return assignment_node
-        else:
-            # For regular assignment, just visit the children as usual
-            return self.visitChildren(node)
+        if node.getChildCount() == 3 and not isinstance(node.getChild(1), TerminalNode):
+            op = node.getChild(1).getChild(0)
+            if isinstance(op, TerminalNode) and op.symbol.type in JAVA_20_AUG_ASSIGN_OPS:
+                excluded = getattr(self, "excluded_token_types", set())
+                rule, op_token = JAVA_20_AUG_ASSIGN_OPS[op.symbol.type]
+                operand = self.visit(node.getChild(0))
+                operand["label"] = JAVA_20_TARGET_AS_OPERAND.get(
+                    operand["label"], operand["label"]
+                )
+                binary = [operand]
+                if op_token not in excluded:
+                    binary.append({"label": op_token + TOKEN_TYPE_OFFSET, "children": []})
+                binary.append(self.visit(node.getChild(2)))
+                if Java20Lexer.ASSIGN in excluded:
+                    assign_op = {"label": Java20Parser.RULE_assignmentOperator, "children": []}
+                else:
+                    assign_op = {"label": Java20Lexer.ASSIGN + TOKEN_TYPE_OFFSET, "children": []}
+                return {
+                    "label": node.getRuleIndex(),
+                    "children": [
+                        self.visit(node.getChild(0)),
+                        assign_op,
+                        {"label": rule, "children": binary},
+                    ],
+                }
+        return self.visitChildren(node)
 
 
 class Java24ParserVisitorExtended(Java24ParserVisitor):
     def visit(self, tree):
         """Override visit to exclude certain rules from being processed.
         This helps in reducing noise in the parse tree by skipping over
-        less relevant constructs.
+        less relevant constructs. Also rewrites `x op= y` (see
+        _expand_augmented_assignment).
         """
-        if (
-            not isinstance(tree, TerminalNode)
-            and tree.getRuleIndex() in JAVA_24_COLLAPSED_RULES
-        ):
-            return {"label": tree.getRuleIndex(), "children": []}
+        if not isinstance(tree, TerminalNode):
+            expanded = self._expand_augmented_assignment(tree)
+            if expanded is not None:
+                return expanded
+            if tree.getRuleIndex() in JAVA_24_COLLAPSED_RULES:
+                return {"label": tree.getRuleIndex(), "children": []}
         return tree.accept(self)
 
-    def visitAssignment(self, node):
-        """Rewrite assignment nodes to a normalized form based on the operator used.
-        This allows different forms of the same underlying operation to be treated as equivalent in similarity comparisons.
-        e.g., "x += 1" and "x = x + 1" would both be normalized to a common representation, improving the accuracy of similarity detection.
+    def _expand_augmented_assignment(self, node):
+        """Rebuild `x op= y` as the tree of `x = x op y`, or return None.
+
+        In this grammar an assignment is `expression bop=<assign op> expression`
+        (children: target, operator token, value) and the target is itself an
+        `expression`, so visiting it twice yields exactly what the grammar
+        builds for the same text on the right-hand side. Done in visit() so
+        the native parser path (dispatching by rule name) sees it too.
         """
-        operand = node.getChild(1).getText()
-        if operand in JAVA_24_ASSIGN_OP_NORMALIZED:
-            # Rewrite the assignment to a normalized form based on the operator
-            rule, operator_token = JAVA_24_ASSIGN_OP_NORMALIZED[operand]
-            assignment_node = {"label": JAVA_24_RULE_ASSIGNMENT, "children": []}
-            norm_node = {"label": rule, "children": []}
-            norm_node["children"].append(self.visit(node.getChild(0)))
-            norm_node["children"].append({"label": operator_token, "children": []})
-            norm_node["children"].append(self.visit(node.getChild(2)))
-            assignment_node["children"].append(norm_node)
-            return assignment_node
-        else:
-            # For regular assignment, just visit the children as usual
-            return self.visitChildren(node)
+        # The native bridge already stamps assignment-shaped nodes with the
+        # synthetic id, the Python parser leaves them as RULE_expression.
+        if node.getChildCount() != 3 or node.getRuleIndex() not in (
+            Java24Parser.RULE_expression,
+            JAVA_24_SYNTHETIC_ASSIGNMENT_EXPR,
+        ):
+            return None
+        op = node.getChild(1)
+        if not isinstance(op, TerminalNode) or op.symbol.type not in JAVA_24_AUG_ASSIGN_OPS:
+            return None
+        excluded = getattr(self, "excluded_token_types", set())
+        binary_token = JAVA_24_AUG_ASSIGN_OPS[op.symbol.type]
+        binary = [self.visit(node.getChild(0))]
+        if binary_token not in excluded:
+            binary.append({"label": binary_token + TOKEN_TYPE_OFFSET, "children": []})
+        binary.append(self.visit(node.getChild(2)))
+        children = [self.visit(node.getChild(0))]
+        if Java24Lexer.ASSIGN not in excluded:
+            children.append({"label": Java24Lexer.ASSIGN + TOKEN_TYPE_OFFSET, "children": []})
+        children.append({"label": Java24Parser.RULE_expression, "children": binary})
+        return {"label": java_24_relabel_node(node) or node.getRuleIndex(), "children": children}
 
 
 class CPP14ParserVisitorExtended(CPP14ParserVisitor):
@@ -227,33 +274,86 @@ class CPP14ParserVisitorExtended(CPP14ParserVisitor):
             return {"label": tree.getRuleIndex(), "children": []}
         return tree.accept(self)
 
-    def visitAssignmentExpression(self, node):
-        """Rewrite assignment nodes to a normalized form based on the operator used.
-        This allows different forms of the same underlying operation to be treated as equivalent in similarity comparisons.
-        e.g., "x += 1" and "x = x + 1" would both be normalized to a common representation, improving the accuracy of similarity detection.
+    def _assign_operator_node(self):
+        """What the grammar leaves for a plain `=` operator after token
+        exclusion: the bare `assignmentOperator` rule node, or the token."""
+        if CPP14Lexer.Assign in getattr(self, "excluded_token_types", set()):
+            return {"label": CPP14Parser.RULE_assignmentOperator, "children": []}
+        return {"label": CPP14Lexer.Assign + TOKEN_TYPE_OFFSET, "children": []}
 
-        Unlike Python/Java, C++'s assignmentExpression rule also matches non-assignment
-        alternatives (a bare conditionalExpression, or a throwExpression), which only ever
-        have a single child. Only the actual assignment alternative has 3 children
-        (logicalOrExpression assignmentOperator initializerClause), so that count is checked
-        before treating child(1) as an operator.
+    def visitAssignmentExpression(self, node):
+        """Rebuild `x op= y` as the tree of `x = x op y` (same rules, same
+        children), so both hash identically. Only the assignment alternative
+        (`logicalOrExpression assignmentOperator initializerClause`) has 3
+        children; a bare conditionalExpression/throwExpression has one.
+        Token types only (native terminals carry no text). Shifts are not in
+        AUG_ASSIGN_OPS and fall through unchanged.
         """
-        if node.getChildCount() != 3:
+        if node.getChildCount() == 3 and not isinstance(node.getChild(1), TerminalNode):
+            op = node.getChild(1).getChild(0)
+            if isinstance(op, TerminalNode) and op.symbol.type in CPP_14_AUG_ASSIGN_OPS:
+                excluded = getattr(self, "excluded_token_types", set())
+                rule, op_token = CPP_14_AUG_ASSIGN_OPS[op.symbol.type]
+                binary = [self.visit(node.getChild(0))]
+                if op_token not in excluded:
+                    binary.append({"label": op_token + TOKEN_TYPE_OFFSET, "children": []})
+                binary.append(self.visit(node.getChild(2)))
+                return {
+                    "label": node.getRuleIndex(),
+                    "children": [
+                        self.visit(node.getChild(0)),
+                        self._assign_operator_node(),
+                        {"label": rule, "children": binary},
+                    ],
+                }
+        return self.visitChildren(node)
+
+    def visitSimpleDeclaration(self, node):
+        """`x = e;` (no type) parses as a *declaration* in this grammar
+        (declSpecifierSeq is optional), while `x += e;` and `p->n = e;` are
+        expression statements. Rebuild the declaration form as the
+        assignmentExpression the expression forms produce, so `x = x + y;`
+        and `x += y;` (and `a[i] = ...` / `p->n = ...`) all meet in one shape.
+        Real declarations (`int x = 1;`) have a declSpecifierSeq and are left
+        alone.
+        """
+        pseudo = self._pseudo_assignment_parts(node)
+        if pseudo is None:
             return self.visitChildren(node)
-        operand = node.getChild(1).getText()
-        if operand in CPP_14_ASSIGN_OP_NORMALIZED:
-            # Rewrite the assignment to a normalized form based on the operator
-            rule, operator_token = CPP_14_ASSIGN_OP_NORMALIZED[operand]
-            assignment_node = {"label": CPP_14_RULE_ASSIGNMENT, "children": []}
-            norm_node = {"label": rule, "children": []}
-            norm_node["children"].append(self.visit(node.getChild(0)))
-            norm_node["children"].append({"label": operator_token, "children": []})
-            norm_node["children"].append(self.visit(node.getChild(2)))
-            assignment_node["children"].append(norm_node)
-            return assignment_node
-        else:
-            # For regular assignment, just visit the children as usual
-            return self.visitChildren(node)
+        declarator, clause = pseudo
+        lhs = self.visit(declarator)
+        # Declarator rules twin the operand rules of the expression grammar.
+        lhs["label"] = CPP_14_DECLARATOR_AS_OPERAND.get(lhs["label"], lhs["label"])
+        return {
+            "label": CPP14Parser.RULE_assignmentExpression,
+            "children": [lhs, self._assign_operator_node(), self.visit(clause)],
+        }
+
+    @staticmethod
+    def _pseudo_assignment_parts(node):
+        """(declarator, initializerClause) when `node` is `<declarator> = <clause>;`
+        with no decl-specifiers, else None."""
+        rules = [c for c in node.getChildren() if not isinstance(c, TerminalNode)]
+        if len(rules) != 1 or rules[0].getRuleIndex() != CPP14Parser.RULE_initDeclaratorList:
+            return None
+        lst = rules[0]
+        if lst.getChildCount() != 1:
+            return None
+        decl = lst.getChild(0)
+        if decl.getRuleIndex() != CPP14Parser.RULE_initDeclarator or decl.getChildCount() != 2:
+            return None
+        init = decl.getChild(1)
+        if init.getRuleIndex() != CPP14Parser.RULE_initializer or init.getChildCount() != 1:
+            return None
+        eq = init.getChild(0)
+        if eq.getRuleIndex() != CPP14Parser.RULE_braceOrEqualInitializer or eq.getChildCount() != 2:
+            return None
+        sign, clause = eq.getChild(0), eq.getChild(1)
+        if not isinstance(sign, TerminalNode) or sign.symbol.type != CPP14Lexer.Assign:
+            return None
+        if isinstance(clause, TerminalNode) or clause.getRuleIndex() != CPP14Parser.RULE_initializerClause:
+            return None
+        return decl.getChild(0), clause
 
 
 class KotlinParserVisitorExtended(KotlinParserVisitor):
@@ -262,9 +362,8 @@ class KotlinParserVisitorExtended(KotlinParserVisitor):
         This helps in reducing noise in the parse tree by skipping over
         less relevant constructs.
 
-        No visitAssignment-style override here: Kotlin's grammar has no
-        ANTLR labeled alternatives at all (unlike java_24/python_3), so
-        there's no relabel_node() hook needed either -- see
+        No relabel_node() hook is needed: Kotlin's grammar has no ANTLR
+        labeled alternatives at all (unlike java_24/python_3) -- see
         csim/kotlin/utils.py's module docstring.
         """
         if (
@@ -274,6 +373,35 @@ class KotlinParserVisitorExtended(KotlinParserVisitor):
             return {"label": tree.getRuleIndex(), "children": []}
         return tree.accept(self)
 
+    def visitExpression(self, node):
+        """Rebuild `x op= y` as the tree of `x = x op y` (same rules, same
+        children), so both hash identically. Assignment is an ordinary
+        `expression` here: `disjunction assignmentOperator disjunction`.
+        Token types only (native terminals carry no text).
+        """
+        if node.getChildCount() == 3 and not isinstance(node.getChild(1), TerminalNode):
+            op = node.getChild(1).getChild(0)
+            if isinstance(op, TerminalNode) and op.symbol.type in KOTLIN_AUG_ASSIGN_OPS:
+                excluded = getattr(self, "excluded_token_types", set())
+                rule, op_token = KOTLIN_AUG_ASSIGN_OPS[op.symbol.type]
+                binary = [self.visit(node.getChild(0))]
+                if op_token not in excluded:
+                    binary.append({"label": op_token + TOKEN_TYPE_OFFSET, "children": []})
+                binary.append(self.visit(node.getChild(2)))
+                if KotlinLexer.ASSIGNMENT in excluded:
+                    assign_op = {"label": KotlinParser.RULE_assignmentOperator, "children": []}
+                else:
+                    assign_op = {"label": KotlinLexer.ASSIGNMENT + TOKEN_TYPE_OFFSET, "children": []}
+                return {
+                    "label": node.getRuleIndex(),
+                    "children": [
+                        self.visit(node.getChild(0)),
+                        assign_op,
+                        {"label": rule, "children": binary},
+                    ],
+                }
+        return self.visitChildren(node)
+
 
 class CParserVisitorExtended(CParserVisitor):
     def visit(self, tree):
@@ -281,9 +409,8 @@ class CParserVisitorExtended(CParserVisitor):
         This helps in reducing noise in the parse tree by skipping over
         less relevant constructs.
 
-        No visitAssignment-style override here: no relabel_node() hook is
-        needed either -- see csim/c/utils.py's module docstring (this
-        grammar has no ANTLR labeled alternatives at all).
+        No relabel_node() hook is needed -- see csim/c/utils.py's module
+        docstring (this grammar has no ANTLR labeled alternatives at all).
         """
         if (
             not isinstance(tree, TerminalNode)
@@ -291,6 +418,31 @@ class CParserVisitorExtended(CParserVisitor):
         ):
             return {"label": tree.getRuleIndex(), "children": []}
         return tree.accept(self)
+
+    def visitAssignmentExpression(self, node):
+        """Rebuild `x op= y` as the tree of `x = x op y` (same rules, same
+        children), so both hash identically. Only the assignment alternative
+        (`unaryExpression <assign op token> assignmentExpression`) has 3
+        children, the operator being a bare terminal (this grammar has no
+        assignment-operator rule). Token types only (native terminals carry
+        no text); shift compounds are not in AUG_ASSIGN_OPS and fall through
+        unchanged.
+        """
+        if node.getChildCount() == 3:
+            op = node.getChild(1)
+            if isinstance(op, TerminalNode) and op.symbol.type in C_AUG_ASSIGN_OPS:
+                excluded = getattr(self, "excluded_token_types", set())
+                rule, op_token = C_AUG_ASSIGN_OPS[op.symbol.type]
+                binary = [self.visit(node.getChild(0))]
+                if op_token not in excluded:
+                    binary.append({"label": op_token + TOKEN_TYPE_OFFSET, "children": []})
+                binary.append(self.visit(node.getChild(2)))
+                children = [self.visit(node.getChild(0))]
+                if CLexer.Assign not in excluded:
+                    children.append({"label": CLexer.Assign + TOKEN_TYPE_OFFSET, "children": []})
+                children.append({"label": rule, "children": binary})
+                return {"label": node.getRuleIndex(), "children": children}
+        return self.visitChildren(node)
 
 
 class Python3ParserVisitorExtended(Python3ParserVisitor):

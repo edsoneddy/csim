@@ -11,24 +11,16 @@ from antlr4 import Token
 #
 # Like Kotlin (and unlike python_3's monolithic `expr`), C's expression
 # grammar is already split one rule per ISO-C precedence level
-# (multiplicativeExpression -> additiveExpression -> shiftExpression ->
-# relationalExpression -> equalityExpression -> andExpression ->
-# exclusiveOrExpression -> inclusiveOrExpression -> logicalAndExpression ->
-# logicalOrExpression -> conditionalExpression -> assignmentExpression).
-# tree_processing.py's visitChildren already compresses any single-child hop
-# through this chain, so no HASHED_RULE_INDICES entry is needed here for
-# tractability -- revisit only if a real corpus shows the tree-edit-distance
-# step becoming a bottleneck.
+# (multiplicativeExpression -> additiveExpression -> ... ->
+# assignmentExpression). tree_processing.py's visitChildren already compresses
+# any single-child hop through this chain.
 #
-# IMPORTANT CAVEAT: there is no C corpus in jv_dataset (the project's
-# real-submission benchmark set) to tune or validate grouping precision
-# against, unlike Java/C++/Python. The tables below follow the same
-# *categories* of exclusion already validated for other languages
-# (structural punctuation, identifier text, body-wrapping content) but have
-# NOT been corpus-measured for false-positive/false-negative rates. Treat
-# this as a reasonable, principled starting point, not a tuned config.
+# Tuning data: jv-umsa-dataset/all_c (real judge submissions). The tables were
+# measured against the unpruned tree on two disjoint problem sets, see
+# docs/pruning_fidelity.md (hashing policy: expression/declaration "islands"
+# only, never the control-flow skeleton).
 #
-# IMPORTANT CAVEAT #2: this grammar's lexer/parser base classes
+# IMPORTANT CAVEAT: this grammar's lexer/parser base classes
 # (CLexerBase/CParserBase, vendored into this same package) default to
 # `--nopp` (no real preprocessing) for reasons documented in
 # grammars/CLexerBase.h -- `#include`/`#define`/etc. lines are swallowed as
@@ -84,6 +76,28 @@ EXCLUDED_TOKEN_TYPES = {
     CLexer.Or,
     CLexer.AndAnd,
     CLexer.OrOr,
+    # Statement keywords: the wrapping rule (selectionStatement/iterationStatement
+    # -- `for`/`while`/`do` share one LOOP label) already carries the meaning,
+    # and a leaked `for` vs `while` keyword leaf would break that equivalence.
+    CLexer.If,
+    CLexer.Else,
+    CLexer.While,
+    CLexer.Do,
+    CLexer.For,
+    CLexer.Switch,
+    CLexer.Case,
+    CLexer.Default,
+    # Built-in type keywords: which numeric type was declared/returned is not
+    # structure (`int main` vs `void solve` should line up).
+    CLexer.Int,
+    CLexer.Void,
+    CLexer.Double,
+    CLexer.Float,
+    CLexer.Char,
+    CLexer.Short,
+    CLexer.Long,
+    CLexer.Signed,
+    CLexer.Unsigned,
 }
 
 EXCLUDE_CHILDRENS_FROM_RULE = dict()
@@ -98,39 +112,83 @@ COLLAPSED_RULE_INDICES = {
     CParser.RULE_identifierList,
 }
 
-# Body-wrapping content, hashed to a single digest for tree-edit-distance
-# tractability on real (potentially large) submissions -- same tradeoff and
-# reasoning as java_24/kotlin's equivalent entries.
-#
-# Deliberately NOT hashing `compoundStatement` itself: it's the generic
-# `{ ... }` wrapper reused for if/while/for bodies too, not just function
-# bodies (see grammars/CParser.g4's iterationStatement/selectionStatement) --
-# hashing it wholesale would be the same over-aggressive collapse java_24
-# tried (RULE_blockStatement) and reverted after it merged unrelated files
-# into false-positive groups on the real corpus (see
-# csim/java_24/utils.py). Hashing at the functionBody/initializer/
-# structOrUnionSpecifier/enumSpecifier granularity keeps signatures
-# (function name, params, struct/enum tag) individually comparable while
-# still bounding how deep TED has to recurse into any one implementation or
-# initializer value.
+# Hashing policy (see docs/pruning_fidelity.md): only "islands" --
+# expressions, declarations, parameter lists and `return`/`break` statements
+# that contain no control flow -- collapse to a digest. Compound statements,
+# if/switch, loops and function definitions stay as real nodes so the
+# program's skeleton survives. The previous policy hashed functionBody whole
+# (one node per function). The island list comes from the rules that never
+# contain a STRUCTURAL rule in real submissions (jv-umsa-dataset/all_c, two
+# disjoint problem sets).
 HASHED_RULE_INDICES = {
-    CParser.RULE_functionBody,
-    CParser.RULE_initializer,
-    CParser.RULE_structOrUnionSpecifier,
-    CParser.RULE_enumSpecifier,
+    CParser.RULE_multiplicativeExpression,
+    CParser.RULE_additiveExpression,
+    CParser.RULE_shiftExpression,
+    CParser.RULE_relationalExpression,
+    CParser.RULE_equalityExpression,
+    CParser.RULE_andExpression,
+    CParser.RULE_exclusiveOrExpression,
+    CParser.RULE_inclusiveOrExpression,
+    CParser.RULE_logicalAndExpression,
+    CParser.RULE_logicalOrExpression,
+    CParser.RULE_conditionalExpression,
+    CParser.RULE_assignmentExpression,
+    CParser.RULE_expression,
+    CParser.RULE_unaryExpression,
+    CParser.RULE_postfixExpression,
+    CParser.RULE_castExpression,
+    CParser.RULE_argumentExpressionList,
+    CParser.RULE_initializerList,
+    CParser.RULE_jumpStatement,
+    CParser.RULE_declaration,
+    CParser.RULE_declarationList,
+    CParser.RULE_declarationSpecifiers,
+    CParser.RULE_declarator,
+    CParser.RULE_directDeclarator,
+    CParser.RULE_initDeclarator,
+    CParser.RULE_initDeclaratorList,
+    CParser.RULE_parameterDeclaration,
+    CParser.RULE_parameterList,
+    CParser.RULE_forCondition,
+    CParser.RULE_forDeclaration,
+    CParser.RULE_forExpression,
+    CParser.RULE_typeName,
 }
 
-# Not populated yet -- no language in csim currently uses this hook.
-CONTROL_EQUIVALENCE_RULE_INDICES = set()
+# A hashed rule is NOT collapsed if its subtree contains one of these.
+STRUCTURAL_RULE_INDICES = {
+    CParser.RULE_compoundStatement,
+    CParser.RULE_blockItemList,
+    CParser.RULE_selectionStatement,
+    CParser.RULE_iterationStatement,
+    CParser.RULE_labeledStatement,
+    CParser.RULE_functionDefinition,
+    CParser.RULE_functionBody,
+    CParser.RULE_structOrUnionSpecifier,
+    CParser.RULE_externalDeclaration,
+    CParser.RULE_translationUnit,
+}
 
-# No visitAssignment-style rewrite wired up in Visitors.py for this language
-# (matching java_24/python_3/kotlin's current "not populated yet" state).
-# C's `assignmentExpression` also has a different shape than the other
-# languages' assignment rule (it's `conditionalExpression | unaryExpression
-# assignementOperator assignmentExpression | DigitSequence` -- 1 or 3
-# children depending on the alternative, plus an unrelated DigitSequence
-# alternative for an old K&R quirk), so porting the existing visitAssignment
-# pattern directly wouldn't apply cleanly even if this were populated.
+# for / while / do-while are all one grammar rule (iterationStatement) and
+# interchangeable ways to write a loop (`for` <-> `while` rewrites are common
+# clones), so they share one label.
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    CParser.RULE_iterationStatement: "LOOP",
+}
+
+# `x op= y` is rebuilt as `x = x op y` (CParserVisitorExtended): augmented
+# token -> (rule of the binary operator, its operator token). Shifts left alone.
+AUG_ASSIGN_OPS = {
+    CLexer.PlusAssign: (CParser.RULE_additiveExpression, CLexer.Plus),
+    CLexer.MinusAssign: (CParser.RULE_additiveExpression, CLexer.Minus),
+    CLexer.StarAssign: (CParser.RULE_multiplicativeExpression, CLexer.Star),
+    CLexer.DivAssign: (CParser.RULE_multiplicativeExpression, CLexer.Div),
+    CLexer.ModAssign: (CParser.RULE_multiplicativeExpression, CLexer.Mod),
+    CLexer.AndAssign: (CParser.RULE_andExpression, CLexer.And),
+    CLexer.OrAssign: (CParser.RULE_inclusiveOrExpression, CLexer.Or),
+    CLexer.XorAssign: (CParser.RULE_exclusiveOrExpression, CLexer.Caret),
+}
+
 RULE_ASSIGNMENT = None
 ASIGN_OP_NORMALIZED = dict()
 

@@ -19,6 +19,17 @@ SYNTHETIC_FOR_STMT = 204
 SYNTHETIC_WITH_STMT = 205
 SYNTHETIC_CLASS_OR_FUNC_STMT = 206
 
+# Readable names for `csim tree` output.
+SYNTHETIC_NAMES = {
+    SYNTHETIC_IMPORT_STMT: "import_stmt",
+    SYNTHETIC_TRY_STMT: "try_stmt",
+    SYNTHETIC_IF_STMT: "if_stmt",
+    SYNTHETIC_WHILE_STMT: "while_stmt",
+    SYNTHETIC_FOR_STMT: "for_stmt",
+    SYNTHETIC_WITH_STMT: "with_stmt",
+    SYNTHETIC_CLASS_OR_FUNC_STMT: "class_or_func_def_stmt",
+}
+
 
 def relabel_node(node):
     """Detect small_stmt/compound_stmt alternatives that need a different

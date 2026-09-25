@@ -25,17 +25,13 @@ from antlr4 import Token
 # python_3's `expr` needed one -- revisit only if a real corpus shows the
 # tree-edit-distance step becoming a bottleneck.
 #
-# IMPORTANT CAVEAT: there is no Kotlin corpus in jv_dataset (the project's
-# real-submission benchmark set) to tune or validate grouping precision
-# against, unlike every other language here. The tables below follow the
-# same *categories* of exclusion already validated for other languages
-# (structural punctuation, identifier text, import/package plumbing,
-# body-wrapping content) but have NOT been corpus-measured for false-
-# positive/false-negative rates the way java_24's SYNTHETIC_ASSIGNMENT_EXPR
-# or python_3's relabel_node() fixes were (see those modules' change
-# history). Treat this as a reasonable, principled starting point, not a
-# tuned config -- a real Kotlin corpus should drive the next pass, the same
-# way jv_dataset drove every other language's tuning.
+# IMPORTANT CAVEAT: there is still no *real* Kotlin corpus. The hashing policy
+# (expression "islands" only, never the control-flow skeleton -- see
+# HASHED_RULE_INDICES below and docs/pruning_fidelity.md) was measured against
+# the unpruned tree on a synthetic judge-style corpus generated for this
+# purpose (jv-umsa-dataset/all_kotlin: 12 problems x 3 algorithms x 3
+# variants), so treat the numbers as indicative. A real Kotlin corpus should
+# drive the next pass.
 
 EXCLUDED_TOKEN_TYPES = {
     # Structural / whitespace / comment tokens. WS is `-> skip` in the
@@ -113,45 +109,85 @@ COLLAPSED_RULE_INDICES = {
     KotlinParser.RULE_importAlias,
 }
 
-# Body-wrapping content, hashed to a single digest for tree-edit-distance
-# tractability on real (potentially large) submissions -- same tradeoff and
-# reasoning as java_24's classBody/methodDeclaration/... entries: each
-# instance still gets its own node (so e.g. a class with one matching method
-# among several differing ones remains partially comparable at the
-# class-body level), but internal differences within one body are all-or-
-# nothing rather than finely diffed.
-#
-# Deliberately NOT hashing `block` itself: `block` is the generic `{ ... }`
-# wrapper reused for if/while/for/try bodies too (see controlStructureBody),
-# not just function/class bodies -- hashing it wholesale would be the same
-# over-aggressive collapse java_24 tried (RULE_blockStatement) and reverted
-# after it merged unrelated files into false-positive groups on the real
-# corpus (see csim/java_24/utils.py). Hashing at the functionBody/classBody/
-# propertyDeclaration granularity keeps signatures (function name, params,
-# property name, type) individually comparable while still bounding how
-# deep TED has to recurse into any one implementation.
+# Hashing policy (see docs/pruning_fidelity.md): only "islands" -- expressions,
+# property declarations, call arguments and parameter lists that contain no
+# control flow -- collapse to a digest. Function/class bodies, blocks, `if`,
+# `when`, `try` and loops stay as real nodes so the program's skeleton
+# survives. The previous policy hashed functionBody/classBody whole (one node
+# per function). Kotlin has no real-submission corpus, so the island list was
+# derived on the synthetic judge-style corpus in jv-umsa-dataset/all_kotlin
+# (12 problems x 3 algorithms x 3 variants; two disjoint problem halves).
 HASHED_RULE_INDICES = {
-    KotlinParser.RULE_classBody,
-    KotlinParser.RULE_enumClassBody,
-    KotlinParser.RULE_functionBody,
+    KotlinParser.RULE_expression,
+    KotlinParser.RULE_disjunction,
+    KotlinParser.RULE_conjunction,
+    KotlinParser.RULE_equalityComparison,
+    KotlinParser.RULE_comparison,
+    KotlinParser.RULE_namedInfix,
+    KotlinParser.RULE_elvisExpression,
+    KotlinParser.RULE_infixFunctionCall,
+    KotlinParser.RULE_rangeExpression,
+    KotlinParser.RULE_additiveExpression,
+    KotlinParser.RULE_multiplicativeExpression,
+    KotlinParser.RULE_prefixUnaryExpression,
+    KotlinParser.RULE_postfixUnaryExpression,
+    KotlinParser.RULE_postfixUnaryOperation,
+    KotlinParser.RULE_callSuffix,
+    KotlinParser.RULE_valueArguments,
+    KotlinParser.RULE_functionLiteral,
+    KotlinParser.RULE_lambdaParameters,
+    KotlinParser.RULE_functionValueParameters,
     KotlinParser.RULE_propertyDeclaration,
     KotlinParser.RULE_multiVariableDeclaration,
+    KotlinParser.RULE_preamble,
 }
 
-# Not populated yet -- no language in csim currently uses this hook (java_24
-# and python_3 both leave it empty too). Left as a documented future knob,
-# not a gap specific to Kotlin.
-CONTROL_EQUIVALENCE_RULE_INDICES = set()
+# A hashed rule is NOT collapsed if its subtree contains one of these (e.g. a
+# lambda whose body holds an `if` or a loop).
+STRUCTURAL_RULE_INDICES = {
+    KotlinParser.RULE_block,
+    KotlinParser.RULE_ifExpression,
+    KotlinParser.RULE_whenExpression,
+    KotlinParser.RULE_whenEntry,
+    KotlinParser.RULE_tryExpression,
+    KotlinParser.RULE_catchBlock,
+    KotlinParser.RULE_finallyBlock,
+    KotlinParser.RULE_loopExpression,
+    KotlinParser.RULE_forExpression,
+    KotlinParser.RULE_whileExpression,
+    KotlinParser.RULE_doWhileExpression,
+    KotlinParser.RULE_functionDeclaration,
+    KotlinParser.RULE_functionBody,
+    KotlinParser.RULE_classDeclaration,
+    KotlinParser.RULE_classBody,
+    KotlinParser.RULE_objectDeclaration,
+    KotlinParser.RULE_controlStructureBody,
+    KotlinParser.RULE_kotlinFile,
+    KotlinParser.RULE_topLevelObject,
+    KotlinParser.RULE_secondaryConstructor,
+    KotlinParser.RULE_anonymousInitializer,
+}
 
-# No visitAssignment-style rewrite wired up in Visitors.py for this language
-# (matching java_24/python_3's current "not populated yet" state). Kotlin's
-# `expression: disjunction (assignmentOperator disjunction)*` is also a
-# repetition rather than always-3-children like the other languages'
-# assignment rule, so porting the existing visitAssignment pattern directly
-# wouldn't even apply cleanly -- would need its own shape-aware rewrite if
-# ever added.
+# `for` and `while` are interchangeable ways to write the same loop (a common
+# clone rewrite), so they share one label; do-while keeps its own.
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    KotlinParser.RULE_forExpression: "LOOP",
+    KotlinParser.RULE_whileExpression: "LOOP",
+}
+
 RULE_ASSIGNMENT = None
 ASIGN_OP_NORMALIZED = dict()
+
+# `x op= y` is rebuilt as `x = x op y` (KotlinParserVisitorExtended): augmented
+# token -> (rule of the binary operator, its operator token). In this grammar
+# an assignment is a plain `expression`: `disjunction assignmentOperator disjunction`.
+AUG_ASSIGN_OPS = {
+    KotlinLexer.ADD_ASSIGNMENT: (KotlinParser.RULE_additiveExpression, KotlinLexer.ADD),
+    KotlinLexer.SUB_ASSIGNMENT: (KotlinParser.RULE_additiveExpression, KotlinLexer.SUB),
+    KotlinLexer.MULT_ASSIGNMENT: (KotlinParser.RULE_multiplicativeExpression, KotlinLexer.MULT),
+    KotlinLexer.DIV_ASSIGNMENT: (KotlinParser.RULE_multiplicativeExpression, KotlinLexer.DIV),
+    KotlinLexer.MOD_ASSIGNMENT: (KotlinParser.RULE_multiplicativeExpression, KotlinLexer.MOD),
+}
 
 EXCLUDED_RULE_TYPES = {
     # Identifier nodes: which name was chosen doesn't reflect an algorithmic

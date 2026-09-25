@@ -99,6 +99,17 @@ COLLAPSED_RULE_INDICES = {
     # Static array-literal display syntax ('{1, 2, 3}')
     Java20Parser.RULE_arrayInitializer,
 }
+
+# Hashing policy (see docs/pruning_fidelity.md): only "islands" -- expressions,
+# simple statements, declarations and parameter lists that contain no control
+# flow -- collapse to a digest. Blocks, loops, conditionals, try/catch, switch,
+# methods and classes stay as real nodes, so the program's skeleton survives.
+# The previous policy also hashed classBody/methodDeclaration/whileStatement/
+# compilationUnit and dropped assignments, if/for/switch/throw/catch entirely:
+# 93% of real files collapsed to ONE node and the index moved by ~0.15 vs. the
+# unpruned tree. This one: ~7x compression at ~0.065-0.08 error.
+# The island list comes from the rules that never contain a STRUCTURAL rule in
+# real submissions (jv-umsa-dataset/all_java, 2 disjoint problem sets).
 HASHED_RULE_INDICES = {
     Java20Parser.RULE_multiplicativeExpression,
     Java20Parser.RULE_additiveExpression,
@@ -110,124 +121,120 @@ HASHED_RULE_INDICES = {
     Java20Parser.RULE_inclusiveOrExpression,
     Java20Parser.RULE_conditionalAndExpression,
     Java20Parser.RULE_conditionalOrExpression,
-    # Additional
+    Java20Parser.RULE_conditionalExpression,
+    Java20Parser.RULE_unaryExpression,
+    Java20Parser.RULE_postfixExpression,
+    Java20Parser.RULE_postIncrementExpression,
+    Java20Parser.RULE_postDecrementExpression,
+    Java20Parser.RULE_preIncrementExpression,
+    Java20Parser.RULE_preDecrementExpression,
+    Java20Parser.RULE_castExpression,
+    Java20Parser.RULE_methodInvocation,
+    Java20Parser.RULE_argumentList,
+    Java20Parser.RULE_arrayAccess,
+    Java20Parser.RULE_arrayCreationExpressionWithoutInitializer,
+    Java20Parser.RULE_dimExprs,
+    Java20Parser.RULE_primaryNoNewArray,
+    Java20Parser.RULE_lambdaExpression,
+    Java20Parser.RULE_unqualifiedClassInstanceCreationExpression,
+    Java20Parser.RULE_assignment,
+    Java20Parser.RULE_localVariableDeclaration,
     Java20Parser.RULE_fieldDeclaration,
     Java20Parser.RULE_variableDeclarator,
-    Java20Parser.RULE_localVariableDeclaration,
-    # Body-wrapping rules: content-based hash preserves genuine differences
-    # while collapsing internal structure to a single node.
-    # csim-batch-tuner sweep, scripts/report.md, verified collision-free
-    # in combination.
-    Java20Parser.RULE_ordinaryCompilationUnit,
-    Java20Parser.RULE_moduleDeclaration,
-    Java20Parser.RULE_classBody,
-    Java20Parser.RULE_methodDeclaration,
-    Java20Parser.RULE_exceptionTypeList,
-    Java20Parser.RULE_constructorDeclaration,
-    Java20Parser.RULE_enumBody,
-    Java20Parser.RULE_enumBodyDeclarations,
-    Java20Parser.RULE_recordDeclaration,
-    Java20Parser.RULE_normalInterfaceDeclaration,
-    Java20Parser.RULE_interfaceMethodDeclaration,
-    Java20Parser.RULE_annotationInterfaceBody,
-    Java20Parser.RULE_assertStatement,
-    Java20Parser.RULE_whileStatement,
-    Java20Parser.RULE_synchronizedStatement,
-    Java20Parser.RULE_tryWithResourcesStatement,
-    Java20Parser.RULE_resourceList,
-    Java20Parser.RULE_unaryExpression,
-    Java20Parser.RULE_conditionalExpression,
-    Java20Parser.RULE_switchExpression,
+    Java20Parser.RULE_variableDeclaratorList,
+    Java20Parser.RULE_methodHeader,
+    Java20Parser.RULE_formalParameter,
+    Java20Parser.RULE_formalParameterList,
+    Java20Parser.RULE_catchFormalParameter,
+    Java20Parser.RULE_arrayType,
+    Java20Parser.RULE_unannArrayType,
+    Java20Parser.RULE_unannClassOrInterfaceType,
+    Java20Parser.RULE_typeArgumentList,
 }
 
-CONTROL_EQUIVALENCE_RULE_INDICES = set()
+# A hashed rule is NOT collapsed if its subtree contains one of these (e.g. a
+# lambda or anonymous class with a block body): its statements are the skeleton.
+STRUCTURAL_RULE_INDICES = {
+    Java20Parser.RULE_block,
+    Java20Parser.RULE_blockStatements,
+    Java20Parser.RULE_ifThenStatement,
+    Java20Parser.RULE_ifThenElseStatement,
+    Java20Parser.RULE_ifThenElseStatementNoShortIf,
+    Java20Parser.RULE_whileStatement,
+    Java20Parser.RULE_whileStatementNoShortIf,
+    Java20Parser.RULE_doStatement,
+    Java20Parser.RULE_forStatement,
+    Java20Parser.RULE_forStatementNoShortIf,
+    Java20Parser.RULE_basicForStatement,
+    Java20Parser.RULE_basicForStatementNoShortIf,
+    Java20Parser.RULE_enhancedForStatement,
+    Java20Parser.RULE_enhancedForStatementNoShortIf,
+    Java20Parser.RULE_switchStatement,
+    Java20Parser.RULE_switchBlock,
+    Java20Parser.RULE_switchBlockStatementGroup,
+    Java20Parser.RULE_switchExpression,
+    Java20Parser.RULE_tryStatement,
+    Java20Parser.RULE_tryWithResourcesStatement,
+    Java20Parser.RULE_catchClause,
+    Java20Parser.RULE_finallyBlock,
+    Java20Parser.RULE_synchronizedStatement,
+    Java20Parser.RULE_labeledStatement,
+    Java20Parser.RULE_labeledStatementNoShortIf,
+    Java20Parser.RULE_methodDeclaration,
+    Java20Parser.RULE_constructorDeclaration,
+    Java20Parser.RULE_classBody,
+    Java20Parser.RULE_classDeclaration,
+    Java20Parser.RULE_normalClassDeclaration,
+    Java20Parser.RULE_enumBody,
+    Java20Parser.RULE_interfaceBody,
+    Java20Parser.RULE_recordBody,
+    Java20Parser.RULE_lambdaBody,
+    Java20Parser.RULE_methodBody,
+    Java20Parser.RULE_constructorBody,
+    Java20Parser.RULE_instanceInitializer,
+    Java20Parser.RULE_staticInitializer,
+    Java20Parser.RULE_ordinaryCompilationUnit,
+}
+
+# The four loop statements are interchangeable ways to write the same loop
+# (`for` <-> `while` rewrites are common clones), so they share one label.
+# do-while keeps its own: its body always runs once.
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    Java20Parser.RULE_basicForStatement: "LOOP",
+    Java20Parser.RULE_enhancedForStatement: "LOOP",
+    Java20Parser.RULE_whileStatement: "LOOP",
+}
 RULE_ASSIGNMENT = Java20Parser.RULE_assignment
 ASIGN_OP_NORMALIZED = dict()
+
+# `x op= y` is rebuilt as `x = x op y` (see Java20ParserVisitorExtended):
+# augmented-assignment token -> (rule of the binary operator, its operator
+# token). Shift compound operators are left alone: `>>` is two tokens here.
+AUG_ASSIGN_OPS = {
+    Java20Lexer.ADD_ASSIGN: (Java20Parser.RULE_additiveExpression, Java20Lexer.ADD),
+    Java20Lexer.SUB_ASSIGN: (Java20Parser.RULE_additiveExpression, Java20Lexer.SUB),
+    Java20Lexer.MUL_ASSIGN: (Java20Parser.RULE_multiplicativeExpression, Java20Lexer.MUL),
+    Java20Lexer.DIV_ASSIGN: (Java20Parser.RULE_multiplicativeExpression, Java20Lexer.DIV),
+    Java20Lexer.MOD_ASSIGN: (Java20Parser.RULE_multiplicativeExpression, Java20Lexer.MOD),
+    Java20Lexer.AND_ASSIGN: (Java20Parser.RULE_andExpression, Java20Lexer.BITAND),
+    Java20Lexer.OR_ASSIGN: (Java20Parser.RULE_inclusiveOrExpression, Java20Lexer.BITOR),
+    Java20Lexer.XOR_ASSIGN: (Java20Parser.RULE_exclusiveOrExpression, Java20Lexer.CARET),
+}
+# The grammar parses an assignment target and the same expression on the
+# right-hand side under different rules for array access.
+TARGET_AS_OPERAND = {
+    Java20Parser.RULE_arrayAccess: Java20Parser.RULE_primaryNoNewArray,
+    # `this.x` / `obj.f()` targets: fieldAccess collapses to primaryNoNewArray,
+    # its operand twin is pNNA.
+    Java20Parser.RULE_primaryNoNewArray: Java20Parser.RULE_pNNA,
+}
+
+# Only identifier text is noise. (The old list also dropped types, modifiers,
+# annotations, loop headers, switch/throw/catch and every assignment: measured
+# as pure signal loss, and the shared boilerplate is already neutralized by
+# hashing.)
 EXCLUDED_RULE_TYPES = {
     Java20Parser.RULE_identifier,
     Java20Parser.RULE_typeIdentifier,
     Java20Parser.RULE_unqualifiedMethodIdentifier,
-    # Type arguments and declarations
-    Java20Parser.RULE_typeArguments,
-    Java20Parser.RULE_typeArgumentList,
-    Java20Parser.RULE_typeArgument,
-    Java20Parser.RULE_typeName,
-    Java20Parser.RULE_typeParameters,
-    Java20Parser.RULE_typeParameterList,
-    # Class declarations and modifiers
-    Java20Parser.RULE_classModifier,
-    Java20Parser.RULE_classExtends,
-    Java20Parser.RULE_classPermits,
-    # Field declarations
-    Java20Parser.RULE_fieldModifier,
-    Java20Parser.RULE_variableDeclaratorId,
-    # Unann types
-    Java20Parser.RULE_unannReferenceType,
-    Java20Parser.RULE_unannClassOrInterfaceType,
-    # Method declarations and parts
-    Java20Parser.RULE_methodModifier,
-    Java20Parser.RULE_result,
-    # Constructors.
-    Java20Parser.RULE_constructorModifier,
-    Java20Parser.RULE_simpleTypeName,
-    # Interfaces.
-    Java20Parser.RULE_interfaceModifier,
-    Java20Parser.RULE_interfaceExtends,
-    # Annotations.
-    Java20Parser.RULE_annotation,
-    Java20Parser.RULE_markerAnnotation,
-    # for-loop control clauses
-    Java20Parser.RULE_forInit,
-    Java20Parser.RULE_forUpdate,
-    Java20Parser.RULE_statementExpressionList,
-    # csim-batch-tuner sweep (scripts/report.md), verified collision-free
-    # in combination with every other entry in this file. NOTE:
-    # topLevelClassOrInterfaceDeclaration was DELIBERATELY EXCLUDED:
-    # confirmed it drops entire class/interface bodies from every
-    # compilation unit (only package/import lines survive). Also dropped
-    # for causing collisions when combined with the rest of this set:
-    # moduleDirective, methodHeader, methodDeclarator, formalParameterList,
-    # formalParameter, staticInitializer, ifThenElseStatement, switchRule,
-    # enhancedForStatement, tryStatement, catches,
-    # unaryExpressionNotPlusMinus. See the audit method note at the end of
-    # this file.
-    Java20Parser.RULE_moduleName,
-    Java20Parser.RULE_classImplements,
-    Java20Parser.RULE_interfaceTypeList,
-    Java20Parser.RULE_receiverParameter,
-    Java20Parser.RULE_variableArityParameter,
-    Java20Parser.RULE_variableModifier,
-    Java20Parser.RULE_throwsT,
-    Java20Parser.RULE_instanceInitializer,
-    Java20Parser.RULE_constructorDeclarator,
-    Java20Parser.RULE_explicitConstructorInvocation,
-    Java20Parser.RULE_enumConstantList,
-    Java20Parser.RULE_enumConstant,
-    Java20Parser.RULE_recordHeader,
-    Java20Parser.RULE_recordComponentList,
-    Java20Parser.RULE_recordComponent,
-    Java20Parser.RULE_interfacePermits,
-    Java20Parser.RULE_constantDeclaration,
-    Java20Parser.RULE_interfaceMethodModifier,
-    Java20Parser.RULE_defaultValue,
-    Java20Parser.RULE_statementNoShortIf,
-    Java20Parser.RULE_ifThenStatement,
-    Java20Parser.RULE_switchStatement,
-    Java20Parser.RULE_switchBlockStatementGroup,
-    Java20Parser.RULE_switchLabel,
-    Java20Parser.RULE_caseConstant,
-    Java20Parser.RULE_doStatement,
-    Java20Parser.RULE_basicForStatement,
-    Java20Parser.RULE_throwStatement,
-    Java20Parser.RULE_catchClause,
-    Java20Parser.RULE_catchFormalParameter,
-    Java20Parser.RULE_catchType,
-    Java20Parser.RULE_finallyBlock,
-    Java20Parser.RULE_resourceSpecification,
-    Java20Parser.RULE_yieldStatement,
-    Java20Parser.RULE_arrayAccess,
-    Java20Parser.RULE_preIncrementExpression,
-    Java20Parser.RULE_castExpression,
-    Java20Parser.RULE_assignment,
-    Java20Parser.RULE_leftHandSide,
 }

@@ -17,6 +17,7 @@ from ..utils import (
     get_hash_rule_indices,
     get_excluded_rule_types,
     get_relabel_fn,
+    get_structural_rule_indices,
 )
 
 
@@ -119,6 +120,7 @@ def PruneAndHash(tree, lang):
     hashed_rule_indices = get_hash_rule_indices(lang)
     control_equivalence_rule_indices = get_control_equivalence_rule_indices(lang)
     exclude_childrens_from_rule = get_exclude_childrens_from_rule(lang)
+    structural_rule_indices = get_structural_rule_indices(lang)
 
     def traverse_subtree(node):
         # Collect all labels in the subtree rooted at `node` into a single list
@@ -155,6 +157,22 @@ def PruneAndHash(tree, lang):
         s = "|".join(map(str, flat))
         return str(label) + "|" + hashlib.sha256(s.encode("utf-8")).hexdigest()
 
+    # Ids of nodes whose subtree contains a structural (control-flow/body)
+    # label. A hashed rule that contains one is NOT collapsed: its content is
+    # part of the program's skeleton (e.g. a lambda with a block body), so only
+    # the structure-free pieces below it get hashed. Empty (and skipped) for
+    # languages that don't declare STRUCTURAL_RULE_INDICES.
+    has_structure = set()
+
+    def mark_structure(node):
+        found = node["label"] in structural_rule_indices
+        for c in node["children"]:
+            if mark_structure(c):
+                found = True
+        if found:
+            has_structure.add(id(node))
+        return found
+
     def hashing_tree(node):
         if node is None:
             return None, 0
@@ -165,7 +183,7 @@ def PruneAndHash(tree, lang):
             label = control_equivalence_rule_indices[label]
 
         # For nodes that are in the hashed rule set, we hash their entire subtree to a single digest
-        if node["label"] in hashed_rule_indices:
+        if node["label"] in hashed_rule_indices and id(node) not in has_structure:
             digest = hash_children(label, node["children"])
             return {"label": digest, "children": []}, 1
 
@@ -181,6 +199,8 @@ def PruneAndHash(tree, lang):
         return new_node, count
 
     pruned_tree = prunning_tree(tree)
+    if structural_rule_indices:
+        mark_structure(pruned_tree)
     hashed_tree, nodes_number = hashing_tree(pruned_tree)
 
     return hashed_tree, nodes_number

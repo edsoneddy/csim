@@ -28,6 +28,19 @@ EXCLUDED_TOKEN_TYPES = {
     CPP14Lexer.DotStar,
     # Identifier
     CPP14Lexer.Identifier,
+    # Built-in type keywords: which numeric type was declared/returned is not
+    # structure (`int main` vs `void solve` should line up).
+    CPP14Lexer.Int,
+    CPP14Lexer.Void,
+    CPP14Lexer.Double,
+    CPP14Lexer.Float,
+    CPP14Lexer.Long,
+    CPP14Lexer.Short,
+    CPP14Lexer.Char,
+    CPP14Lexer.Bool,
+    CPP14Lexer.Signed,
+    CPP14Lexer.Unsigned,
+    CPP14Lexer.Auto,
     # Ternary '?'/':'
     CPP14Lexer.Question,
     CPP14Lexer.Colon,
@@ -76,14 +89,8 @@ EXCLUDED_TOKEN_TYPES = {
     CPP14Lexer.Assign,
     CPP14Lexer.PlusPlus,
 }
-EXCLUDE_CHILDRENS_FROM_RULE = {
-    CPP14Parser.RULE_andExpression: [
-        CPP14Lexer.And + TOKEN_TYPE_OFFSET,
-    ],
-    CPP14Parser.RULE_inclusiveOrExpression: [
-        CPP14Lexer.Or + TOKEN_TYPE_OFFSET,
-    ],
-}
+EXCLUDE_CHILDRENS_FROM_RULE = dict()
+
 COLLAPSED_RULE_INDICES = {
     # Namespace/using machinery
     CPP14Parser.RULE_usingDeclaration,
@@ -91,16 +98,27 @@ COLLAPSED_RULE_INDICES = {
     CPP14Parser.RULE_namespaceAliasDefinition,
     # Aggregate-initialization literal syntax ('{1, 2, 3}', 'Point{1, 2}')
     CPP14Parser.RULE_bracedInitList,
-    # csim-batch-tuner sweep, scripts/report.md, verified collision-free
-    # in combination.
     CPP14Parser.RULE_expressionList,
     CPP14Parser.RULE_baseSpecifier,
     CPP14Parser.RULE_memInitializer,
 }
+
+# Hashing policy (see docs/pruning_fidelity.md): only "islands" -- expressions,
+# declarations, parameter lists and type specifiers that contain no control
+# flow -- collapse to a digest. Compound statements, if/switch, loops, function
+# definitions, classes and namespaces stay as real nodes so the program's
+# skeleton survives. The previous policy also hashed selectionStatement/
+# functionDefinition/classSpecifier/... and excluded declarationStatement,
+# condition and assignmentOperator: median 3 nodes per file and the index
+# moved by ~0.3 (bias +0.26) vs. the unpruned tree. This one: ~7x
+# compression at ~0.1 error. The island list comes from the rules that never
+# contain a STRUCTURAL rule in real submissions (jv-umsa-dataset/all_cpp, two
+# disjoint problem sets).
 HASHED_RULE_INDICES = {
     CPP14Parser.RULE_multiplicativeExpression,
     CPP14Parser.RULE_additiveExpression,
     CPP14Parser.RULE_shiftExpression,
+    CPP14Parser.RULE_shiftOperator,
     CPP14Parser.RULE_relationalExpression,
     CPP14Parser.RULE_equalityExpression,
     CPP14Parser.RULE_andExpression,
@@ -108,99 +126,83 @@ HASHED_RULE_INDICES = {
     CPP14Parser.RULE_inclusiveOrExpression,
     CPP14Parser.RULE_logicalAndExpression,
     CPP14Parser.RULE_logicalOrExpression,
-    # Body-wrapping rules: content-based hash preserves genuine differences
-    # while collapsing internal structure to a single node.
-    # csim-batch-tuner sweep, scripts/report.md, verified collision-free
-    # in combination.
-    CPP14Parser.RULE_lambdaExpression,
+    CPP14Parser.RULE_conditionalExpression,
+    CPP14Parser.RULE_assignmentExpression,
+    CPP14Parser.RULE_expression,
     CPP14Parser.RULE_unaryExpression,
+    CPP14Parser.RULE_postfixExpression,
+    CPP14Parser.RULE_castExpression,
     CPP14Parser.RULE_newExpression_,
-    CPP14Parser.RULE_labeledStatement,
-    CPP14Parser.RULE_selectionStatement,
+    CPP14Parser.RULE_lambdaExpression,
+    CPP14Parser.RULE_declaration,
     CPP14Parser.RULE_simpleDeclaration,
-    CPP14Parser.RULE_enumSpecifier,
-    CPP14Parser.RULE_enumHead,
-    CPP14Parser.RULE_opaqueEnumDeclaration,
-    CPP14Parser.RULE_namespaceDefinition,
-    CPP14Parser.RULE_linkageSpecification,
     CPP14Parser.RULE_initDeclarator,
-    CPP14Parser.RULE_functionDefinition,
-    CPP14Parser.RULE_classSpecifier,
-    CPP14Parser.RULE_memberdeclaration,
-    CPP14Parser.RULE_virtualSpecifierSeq,
-    CPP14Parser.RULE_baseSpecifierList,
-    CPP14Parser.RULE_memInitializerList,
-    CPP14Parser.RULE_templateDeclaration,
-    CPP14Parser.RULE_explicitSpecialization,
-    CPP14Parser.RULE_exceptionDeclaration,
-    CPP14Parser.RULE_noeExceptSpecification,
-}
-CONTROL_EQUIVALENCE_RULE_INDICES = set()
-RULE_ASSIGNMENT = CPP14Parser.RULE_assignmentExpression
-ASIGN_OP_NORMALIZED = dict()
-EXCLUDED_RULE_TYPES = {
-    CPP14Parser.RULE_nestedNameSpecifier,
-    CPP14Parser.RULE_lambdaIntroducer,
-    # Statements
-    CPP14Parser.RULE_forInitStatement,
-    # Declarations
-    CPP14Parser.RULE_aliasDeclaration,
-    # Type specifiers
-    CPP14Parser.RULE_trailingTypeSpecifier,
-    CPP14Parser.RULE_trailingTypeSpecifierSeq,
-    CPP14Parser.RULE_simpleTypeSpecifier,
-    CPP14Parser.RULE_theTypeName,
-    # Namespace
-    CPP14Parser.RULE_pointerOperator,
-    CPP14Parser.RULE_cvqualifierseq,
-    CPP14Parser.RULE_theTypeId,
-    CPP14Parser.RULE_abstractDeclarator,
-    # Functions and definitions
-    CPP14Parser.RULE_className,
-    # csim-batch-tuner sweep (scripts/report.md), verified collision-free
-    # in combination with every other entry in this file. NOTE: several
-    # recommendations were dropped for causing collisions when combined
-    # with the rest of this set -- most severely declarator/
-    # pointerDeclarator/noPointerDeclarator/parametersAndQualifiers/
-    # declSpecifier/declSpecifierSeq/blockDeclaration, which together
-    # would have erased almost all distinguishing content from ordinary
-    # declarations. Also dropped: pointerMemberExpression,
-    # assignmentExpression, expression, constantExpression, jumpStatement,
-    # attributeSpecifierSeq, classHead, memberDeclaratorList,
-    # memberDeclarator. See the audit method note at the end of this file.
-    CPP14Parser.RULE_alignmentspecifier,
-    CPP14Parser.RULE_asmDefinition,
-    CPP14Parser.RULE_assignmentOperator,
-    CPP14Parser.RULE_baseTypeSpecifier,
-    CPP14Parser.RULE_classHeadName,
-    CPP14Parser.RULE_classKey,
-    CPP14Parser.RULE_condition,
-    CPP14Parser.RULE_constructorInitializer,
-    CPP14Parser.RULE_conversionFunctionId,
-    CPP14Parser.RULE_conversionTypeId,
-    CPP14Parser.RULE_declarationStatement,
-    CPP14Parser.RULE_deleteExpression,
-    CPP14Parser.RULE_dynamicExceptionSpecification,
-    CPP14Parser.RULE_enumbase,
-    CPP14Parser.RULE_enumerator,
-    CPP14Parser.RULE_enumeratorDefinition,
-    CPP14Parser.RULE_enumeratorList,
-    CPP14Parser.RULE_explicitInstantiation,
+    CPP14Parser.RULE_initDeclaratorList,
     CPP14Parser.RULE_forRangeDeclaration,
-    CPP14Parser.RULE_forRangeInitializer,
-    CPP14Parser.RULE_literalOperatorId,
-    CPP14Parser.RULE_meminitializerid,
-    CPP14Parser.RULE_newDeclarator_,
-    CPP14Parser.RULE_newInitializer_,
-    CPP14Parser.RULE_newTypeId,
-    CPP14Parser.RULE_noExceptExpression,
-    CPP14Parser.RULE_operatorFunctionId,
-    CPP14Parser.RULE_pureSpecifier,
-    CPP14Parser.RULE_staticAssertDeclaration,
-    CPP14Parser.RULE_templateParameter,
+    CPP14Parser.RULE_declSpecifierSeq,
+    CPP14Parser.RULE_typeSpecifierSeq,
+    CPP14Parser.RULE_simpleTypeSpecifier,
+    CPP14Parser.RULE_theTypeId,
+    CPP14Parser.RULE_pointerDeclarator,
+    CPP14Parser.RULE_noPointerDeclarator,
+    CPP14Parser.RULE_parameterDeclaration,
+    CPP14Parser.RULE_parameterDeclarationList,
+    CPP14Parser.RULE_qualifiedId,
+    CPP14Parser.RULE_simpleTemplateId,
+    CPP14Parser.RULE_templateArgumentList,
     CPP14Parser.RULE_templateparameterList,
     CPP14Parser.RULE_theOperator,
-    CPP14Parser.RULE_throwExpression,
-    CPP14Parser.RULE_trailingReturnType,
-    CPP14Parser.RULE_typeIdList,
 }
+
+# A hashed rule is NOT collapsed if its subtree contains one of these (e.g. a
+# lambda with a compound-statement body).
+STRUCTURAL_RULE_INDICES = {
+    CPP14Parser.RULE_compoundStatement,
+    CPP14Parser.RULE_statementSeq,
+    CPP14Parser.RULE_selectionStatement,
+    CPP14Parser.RULE_iterationStatement,
+    CPP14Parser.RULE_labeledStatement,
+    CPP14Parser.RULE_functionBody,
+    CPP14Parser.RULE_functionDefinition,
+    CPP14Parser.RULE_classSpecifier,
+    CPP14Parser.RULE_namespaceDefinition,
+    CPP14Parser.RULE_templateDeclaration,
+    CPP14Parser.RULE_tryBlock,
+    CPP14Parser.RULE_handler,
+    CPP14Parser.RULE_functionTryBlock,
+    CPP14Parser.RULE_linkageSpecification,
+}
+
+# for / while / do-while / range-for are all one grammar rule
+# (iterationStatement) and interchangeable ways to write a loop -- `for` <->
+# `while` rewrites are common clones -- so they share one label.
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    CPP14Parser.RULE_iterationStatement: "LOOP",
+}
+RULE_ASSIGNMENT = CPP14Parser.RULE_assignmentExpression
+ASIGN_OP_NORMALIZED = dict()
+
+# `x op= y` is rebuilt as `x = x op y` (CPP14ParserVisitorExtended): augmented
+# token -> (rule of the binary operator, its operator token). Shifts left alone.
+AUG_ASSIGN_OPS = {
+    CPP14Lexer.PlusAssign: (CPP14Parser.RULE_additiveExpression, CPP14Lexer.Plus),
+    CPP14Lexer.MinusAssign: (CPP14Parser.RULE_additiveExpression, CPP14Lexer.Minus),
+    CPP14Lexer.StarAssign: (CPP14Parser.RULE_multiplicativeExpression, CPP14Lexer.Star),
+    CPP14Lexer.DivAssign: (CPP14Parser.RULE_multiplicativeExpression, CPP14Lexer.Div),
+    CPP14Lexer.ModAssign: (CPP14Parser.RULE_multiplicativeExpression, CPP14Lexer.Mod),
+    CPP14Lexer.AndAssign: (CPP14Parser.RULE_andExpression, CPP14Lexer.And),
+    CPP14Lexer.OrAssign: (CPP14Parser.RULE_inclusiveOrExpression, CPP14Lexer.Or),
+    CPP14Lexer.XorAssign: (CPP14Parser.RULE_exclusiveOrExpression, CPP14Lexer.Caret),
+}
+
+# A type-less `x = e;` parses as a declaration: its declarator rules are the
+# twins of the operand rules the same text gets in an expression.
+DECLARATOR_AS_OPERAND = {
+    CPP14Parser.RULE_noPointerDeclarator: CPP14Parser.RULE_postfixExpression,
+    CPP14Parser.RULE_pointerDeclarator: CPP14Parser.RULE_unaryExpression,
+}
+
+# Identifier text is already dropped at token level; no rule is pure noise.
+# (The old list excluded declarationStatement, condition, assignmentOperator,
+# type specifiers, pointer operators, ... -- measured as signal loss.)
+EXCLUDED_RULE_TYPES = set()

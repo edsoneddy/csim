@@ -72,3 +72,56 @@ compression ~7x):
   the near-raw reference, which keeps loop kinds distinct.
 * **Loop variable and `def`/`class` keywords** are dropped: identifier-like
   or redundant with the rule label.
+
+## All languages (3.4.0)
+
+The same policy (hash expression/declaration *islands*, never the control-flow
+skeleton; `STRUCTURAL_RULE_INDICES` guards nesting) was applied to Java 20/24,
+C++14, C and Kotlin. Method as above, on `jv-umsa-dataset/all_java`, `all_cpp`,
+`all_c` (two or three disjoint 12-problem sets each). The reference for
+"unpruned" keeps the language's `for`/`while` equivalence, since that is a
+deliberate normalization. Kotlin has no real corpus: `all_kotlin` is a
+synthetic judge-style set (see its README), so its numbers are indicative.
+
+| Language | Mean error before | Mean error now | Compression now |
+|---|---|---|---|
+| python_3 | 0.14-0.16 (~30x) | 0.083-0.092 | ~6x |
+| python_3_13 | 0.14-0.18 (~30x) | 0.071-0.091 | ~6x |
+| java_20 | 0.146 (93% of files = 1 node) | 0.063-0.075 | ~7.5x |
+| java_24 | 0.297 (median 8 nodes) | 0.086-0.100 | ~9.5x |
+| cpp_14 | 0.302, bias +0.26 (median 3 nodes) | 0.094-0.095 | ~7x |
+| c | 0.033 (hashing was a near no-op, 1.6x) | 0.110-0.118 | ~5.5x |
+| kotlin (synthetic) | 0.101 (3x on tiny programs) | 0.084-0.088 | ~6x |
+
+**False similarity between different problems** (500 random cross-problem
+pairs, fraction scoring >= 0.7; unpruned tree: 0% everywhere except the tiny
+synthetic Kotlin programs). The old configs inflated it badly: java_24 40.4%,
+cpp_14 34.4% (java_20 stayed at 0% but its mean similarity rose 0.31 -> 0.50).
+Now: 0% for python_3, python_3_13, java_24, cpp_14 and c, 0-0.2% for java_20;
+Kotlin goes from 1.6-4.2% (unpruned) to 6.8-9.4% because its synthetic programs
+are ~20 nodes after pruning.
+
+### Controlled clone sets
+
+`jv-umsa-dataset/controlled` (Python) and `controlled/{java,cpp,c,kotlin}`: one
+program and 8 rewrites (reformatting, comments, renaming, reordering, an extra
+statement, wrapping in a function, `for` -> `while`, `+=`), 36 all-vs-all pairs,
+all clones. Pairs scoring >= 0.7: python_3 35, python_3_13 34, java_20 34,
+java_24 34, cpp_14 34, kotlin 35, **c 28** (all 8 misses involve the
+function-wrapped rewrite, ~0.65; the extra `main` adds ~7 nodes to a ~20-node
+tree). Two per-language tweaks were needed and cost fidelity: java_24 excludes
+modifier rules (+~0.01 error) and cpp_14/c exclude built-in type keywords and,
+for C, statement keywords (neutral).
+
+### Language-specific notes
+
+* **C++**: the grammar parses a type-less `x = e;` as a *declaration*; it is
+  rebuilt into the same assignment-expression shape as `x += e;` / `p->n = e;`.
+  `for`/`while`/`do` are one rule (`iterationStatement`), so all three share
+  `LOOP`.
+* **java_24**: `expression`/`statement` are unified rules; control statements get
+  synthetic ids in `relabel_node()` (Python side only) so they can be marked
+  structural. Assignments are no longer excluded.
+* **java_20 / C++**: doubly-indexed targets (`a[i][j] op= ...`) do not yet
+  match their expansion exactly.
+* **C**: no assignment-operator rule exists; the operator is a bare terminal.

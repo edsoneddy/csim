@@ -10,6 +10,44 @@ from antlr4.tree.Tree import TerminalNode
 # clear of both ranges.
 SYNTHETIC_ASSIGNMENT_EXPR = 200
 
+# Synthetic ids for the control-flow alternatives of the unified `statement`
+# rule (they all share RULE_statement with `return`, `break`, `x;`, ...), so
+# STRUCTURAL_RULE_INDICES/CONTROL_EQUIVALENCE_RULE_INDICES can single them out.
+# Python-side only: relabel_node() runs on both the Python and native parse
+# trees (it only reads children), unlike the assignment id which the native
+# bridge also stamps.
+SYNTHETIC_IF_STMT = 201
+SYNTHETIC_FOR_STMT = 202
+SYNTHETIC_WHILE_STMT = 203
+SYNTHETIC_DO_STMT = 204
+SYNTHETIC_TRY_STMT = 205
+SYNTHETIC_SWITCH_STMT = 206
+SYNTHETIC_SYNC_STMT = 207
+SYNTHETIC_LABELED_STMT = 208
+
+# Readable names for `csim tree` output.
+SYNTHETIC_NAMES = {
+    SYNTHETIC_ASSIGNMENT_EXPR: "assignment_expr",
+    SYNTHETIC_IF_STMT: "if_stmt",
+    SYNTHETIC_FOR_STMT: "for_stmt",
+    SYNTHETIC_WHILE_STMT: "while_stmt",
+    SYNTHETIC_DO_STMT: "do_stmt",
+    SYNTHETIC_TRY_STMT: "try_stmt",
+    SYNTHETIC_SWITCH_STMT: "switch_stmt",
+    SYNTHETIC_SYNC_STMT: "synchronized_stmt",
+    SYNTHETIC_LABELED_STMT: "labeled_stmt",
+}
+
+_STATEMENT_KEYWORDS = {
+    Java24Lexer.IF: SYNTHETIC_IF_STMT,
+    Java24Lexer.FOR: SYNTHETIC_FOR_STMT,
+    Java24Lexer.WHILE: SYNTHETIC_WHILE_STMT,
+    Java24Lexer.DO: SYNTHETIC_DO_STMT,
+    Java24Lexer.TRY: SYNTHETIC_TRY_STMT,
+    Java24Lexer.SWITCH: SYNTHETIC_SWITCH_STMT,
+    Java24Lexer.SYNCHRONIZED: SYNTHETIC_SYNC_STMT,
+}
+
 # The `bop` token that distinguishes an assignment-shaped `expression` from
 # every other binary operator sharing the same rule index and the same
 # #BinaryOperatorExpression label (see relabel_node()'s docstring).
@@ -30,36 +68,42 @@ ASSIGNMENT_OPERATOR_TOKENS = {
 
 
 def relabel_node(node):
-    """Detect assignment-shaped `expression` nodes and return a synthetic
-    rule id for them, or None to leave the node's normal rule index alone.
+    """Return a synthetic rule id for nodes that share a rule index with
+    unrelated alternatives, or None to leave the node's normal rule index alone.
 
-    Why this exists: java_20 achieves most of its tolerance for cosmetic/
-    computational differences by putting `assignment` (its own, separate
-    grammar rule) in EXCLUDED_RULE_TYPES -- tree_processing.py's visitChildren
-    drops that node AND its entire subtree (LHS, operator, RHS) outright.
-    java_24's optimized grammar has no separate `assignment` rule to target
-    the same way: assignment is one alternative of the unified `expression`
-    rule (ruleIndex 99), and ANTLR gives it the SAME generated label,
-    #BinaryOperatorExpression, as every other binary operator (+, -, *, ==,
-    <, &&, ...) -- see grammars/Java24Parser.g4's `expression` rule, "Level 1,
-    Assignment". Neither rule index nor label can isolate it.
+    java_24's grammar is optimized/left-factored: `expression` and `statement`
+    are single rules whose labeled alternatives (#BinaryOperatorExpression,
+    #MethodCallExpression, ... / if, for, while, return, `x;`, ...) ALL share
+    one rule index, so neither the rule index nor the ANTLR label can tell an
+    assignment from `a + b`, or an `if` from a `return`. What does tell them
+    apart is the children shape, checked here (this function only reads
+    children, so it works on both the Python and the native parse tree):
 
-    What DOES isolate it: the actual operator TOKEN. An assignment-shaped
-    expression is `expression bop=(ASSIGN|ADD_ASSIGN|...) expression` --
-    exactly 3 children, with child 1 being one of the 12 assignment-operator
-    tokens. This is checked directly against children here (Python path) and
-    mirrored in csim/native/src/java_24_bridge.cpp (native path) to relabel
-    such nodes to SYNTHETIC_ASSIGNMENT_EXPR instead of RULE_expression,
-    before either path builds the normalized tree -- so both paths agree,
-    and csim/java_24/utils.py's EXCLUDED_RULE_TYPES can then drop
-    SYNTHETIC_ASSIGNMENT_EXPR nodes (and their subtree) the same way
-    java_20 drops RULE_assignment.
-
-    Measured effect on jv_dataset/all_java/1037 (50 real files): false
-    positives among pairs scoring >=0.8 similarity dropped from 532/570
-    (93%) to 0/570 once this relabeling was combined with adding
-    SYNTHETIC_ASSIGNMENT_EXPR to EXCLUDED_RULE_TYPES -- see CHANGELOG.md.
+    * `expression` with exactly 3 children whose middle one is an assignment
+      operator token -> SYNTHETIC_ASSIGNMENT_EXPR. That id is hashed as an
+      island (HASHED_RULE_INDICES) and is what the visitor rewrites for
+      `x op= y` (Visitors.py). The native bridge
+      (csim/native/src/java_24_bridge.cpp) stamps the same id.
+    * `statement` starting with `if`/`for`/`while`/`do`/`try`/`switch`/
+      `synchronized`, or `identifier :` (labeled) -> SYNTHETIC_*_STMT, so
+      STRUCTURAL_RULE_INDICES (control flow is never hashed) and
+      CONTROL_EQUIVALENCE_RULE_INDICES (for/while share one label) can target
+      them.
     """
+    if node.getRuleIndex() == Java24Parser.RULE_statement:
+        if node.getChildCount() == 0:
+            return None
+        first = node.getChild(0)
+        if isinstance(first, TerminalNode):
+            return _STATEMENT_KEYWORDS.get(first.symbol.type)
+        if (
+            node.getChildCount() == 3
+            and first.getRuleIndex() == Java24Parser.RULE_identifier
+            and isinstance(node.getChild(1), TerminalNode)
+            and node.getChild(1).symbol.type == Java24Lexer.COLON
+        ):
+            return SYNTHETIC_LABELED_STMT
+        return None
     if node.getRuleIndex() != Java24Parser.RULE_expression:
         return None
     if node.getChildCount() != 3:
@@ -69,34 +113,15 @@ def relabel_node(node):
         return SYNTHETIC_ASSIGNMENT_EXPR
     return None
 
-# Reconstructed 2026-08-12 to replace an earlier draft that (a) mistakenly
-# hashed the grammar's root rule (compilationUnit), collapsing every file to
-# a single node regardless of content, and (b) copied java_20/utils.py's
-# rule-index tables verbatim despite java_24 using a structurally different
-# grammar (grammars-v4/java/java, optimized/left-factored) instead of
-# java_20's near-literal JLS transcription.
-#
-# Key structural difference discovered while rebuilding this: java_24 uses
-# ANTLR labeled alternatives for `expression` (rule 99) and `statement`
-# (rule 85) -- e.g. BinaryOperatorExpressionContext, MethodCallExpressionContext,
-# UnaryOperatorExpressionContext all share getRuleIndex() == 99. Unlike
-# java_20 (which has a distinct rule per JLS precedence level / statement
-# kind), java_24 cannot distinguish these by rule label alone -- only by
-# children shape. That means java_20's HASHED_RULE_INDICES entries for its
-# separate precedence-chain rules (additiveExpression, multiplicativeExpression,
-# ...) and its separate statement-kind rules (whileStatement, doStatement,
-# switchStatement, tryWithResourcesStatement, assertStatement, ...) have NO
-# safe 1:1 equivalent here: hashing java_24's `expression` or `statement`
-# wholesale would collapse unrelated construct kinds together. Both are left
-# unclassified (full structural comparison) rather than mapped.
+# Policy notes (see docs/pruning_fidelity.md): only expression/declaration
+# "islands" are hashed and the control-flow skeleton never is. An earlier draft
+# hashed the grammar root (compilationUnit), which collapses every file to a
+# single node; the version after it hashed classBody/methodDeclaration and
+# dropped every assignment, which left ~1-5 nodes per file.
 #
 # EXCLUDED_TOKEN_TYPES below is a direct, mechanical port of java_20's set:
 # grammars-v4/java/java and grammars-v4/java/java20 share identical lexer
 # token names, so this mapping carries over safely construct-by-construct.
-# The rule-index sets (COLLAPSED/HASHED/EXCLUDED_RULE_TYPES) below are
-# ported only where java_24 has a rule with equivalent scope/semantics to
-# its java_20 counterpart -- verified by name and by reading
-# grammars/Java24Parser.g4, not by index position.
 
 EXCLUDED_TOKEN_TYPES = {
     # Structural / whitespace / comment tokens.
@@ -177,138 +202,123 @@ EXCLUDED_TOKEN_TYPES = {
     Java24Lexer.ELLIPSIS,
     Java24Lexer.BANG,
     Java24Lexer.TILDE,
+    # Built-in type keywords: which primitive type was declared/returned is not
+    # structure (`int f` vs `void g` should line up).
+    Java24Lexer.VOID,
+    Java24Lexer.INT,
+    Java24Lexer.LONG,
+    Java24Lexer.SHORT,
+    Java24Lexer.BYTE,
+    Java24Lexer.CHAR,
+    Java24Lexer.DOUBLE,
+    Java24Lexer.FLOAT,
+    Java24Lexer.BOOLEAN,
 }
 
 EXCLUDE_CHILDRENS_FROM_RULE = dict()
 
-# java_20 equivalents: importDeclaration (+ its now-inlined single/on-demand
-# variants -- java_24's importDeclaration is already a single unsplit rule,
-# so one entry here covers what took five in java_20), packageDeclaration,
-# arrayInitializer. All three exist in java_24 with the same scope/semantics.
 COLLAPSED_RULE_INDICES = {
     Java24Parser.RULE_packageDeclaration,
     Java24Parser.RULE_importDeclaration,
     Java24Parser.RULE_arrayInitializer,
 }
 
-# RULE_blockStatement (collapsed) was tried and REVERTED (2026-08-12). A
-# greedy per-candidate search against a 25-pair unrelated sample from
-# jv_dataset/all_java/1037 showed it raising the known-duplicate pairs to a
-# perfect 1.00 (from 0.94) without raising that sample's worst case above
-# 0.94 -- looked like a clean win. Re-checked against the FULL 1187-pair
-# unrelated set from the same corpus: worst-case unrelated similarity also
-# rose to a perfect 1.00 (70 unrelated pairs now score exactly 1.0, fully
-# indistinguishable from real duplicates), and pairs scoring >=0.8 rose from
-# 532 to 549. A 25-pair sample was not enough evidence to catch this --
-# collapsing block-level content broadly enough makes several *different*
-# simple programs (not just the intended near-duplicates) converge to
-# identical trees once assignment payloads are already stripped by
-# SYNTHETIC_ASSIGNMENT_EXPR. This is the same class of failure java_20's own
-# corpus-tuner tooling exists to catch (see csim_native_parsers project
-# memory) via much larger, cross-problem-diverse samples (hundreds of files
-# spanning many different problems, not one problem's 50 submissions) --
-# properly validating any further candidate here needs that scale, not an
-# ad-hoc sample.
-
-# Body-wrapping rules that exist in java_24 with equivalent scope to their
-# java_20 counterpart (verified via grammars/Java24Parser.g4): each only
-# wraps a class/interface/record/enum/method BODY, never gets skipped by
-# visitChildren's single-child passthrough, and content-based hashing
-# preserves genuine differences while collapsing internal noise, same
-# reasoning as java_20/utils.py's equivalent set.
-#
-# Deliberately NOT included (no safe java_20-style equivalent -- see module
-# docstring): compilationUnit (the grammar root -- hashing it collapses the
-# entire file to one node, which is what broke the original draft).
-#
-# RULE_expression was tried and REJECTED (2026-08-12): java_20 achieves its
-# high tolerance for cosmetic/computational differences mainly by DROPPING
-# assignment/leftHandSide and forInit/forUpdate ENTIRELY (EXCLUDED_RULE_TYPES
-# removes a node and all its children -- see tree_processing.py's
-# visitChildren, `elif child.getRuleIndex() not in self.excluded_rule_types`).
-# java_24 has no separate `assignment` rule to target the same way --
-# assignment is one labeled alternative sharing ruleIndex 99 with every other
-# expression kind, so hashing/excluding rule 99 wholesale was tried and
-# rejected: it collapsed 33/50 unrelated files into one false-positive group
-# on the real corpus (jv_dataset/all_java/1037) instead of the 3 small,
-# correct groups java_20 finds. The rule 99 problem was solved differently
-# instead -- see relabel_node() above and SYNTHETIC_ASSIGNMENT_EXPR in
-# EXCLUDED_RULE_TYPES below, plus the matching relabeling in
-# csim/native/src/java_24_bridge.cpp -- rather than by hashing/excluding the
-# whole rule.
+# Hashing policy (see docs/pruning_fidelity.md and java_20/utils.py): only
+# "islands" -- expressions, declarations, loop headers and parameter lists that
+# contain no control flow -- collapse to a digest. `expression` is java_24's
+# unified operator rule, so hashing it whole is safe now: it is only hashed
+# when its subtree holds nothing in STRUCTURAL_RULE_INDICES, and the digest
+# covers every operator/operand label below it. The previous policy hashed
+# classBody/methodDeclaration/... (the whole program in one or two nodes) and
+# dropped every assignment, which collapsed files to a handful of nodes.
 HASHED_RULE_INDICES = {
+    Java24Parser.RULE_expression,
+    Java24Parser.RULE_expressionList,
+    SYNTHETIC_ASSIGNMENT_EXPR,
+    Java24Parser.RULE_creator,
+    Java24Parser.RULE_arrayCreatorRest,
+    Java24Parser.RULE_lambdaExpression,
+    Java24Parser.RULE_forControl,
+    Java24Parser.RULE_enhancedForControl,
+    Java24Parser.RULE_localVariableDeclaration,
     Java24Parser.RULE_fieldDeclaration,
     Java24Parser.RULE_variableDeclarator,
-    Java24Parser.RULE_localVariableDeclaration,
-    Java24Parser.RULE_classBody,
-    Java24Parser.RULE_methodDeclaration,
-    Java24Parser.RULE_constructorDeclaration,
-    Java24Parser.RULE_recordDeclaration,
-    Java24Parser.RULE_interfaceDeclaration,
-    Java24Parser.RULE_interfaceMethodDeclaration,
-    Java24Parser.RULE_annotationTypeBody,
-    Java24Parser.RULE_switchExpression,
+    Java24Parser.RULE_variableDeclarators,
+    Java24Parser.RULE_formalParameter,
+    Java24Parser.RULE_formalParameterList,
+    Java24Parser.RULE_formalParameters,
+    Java24Parser.RULE_typeArguments,
+    Java24Parser.RULE_classType,
 }
 
-CONTROL_EQUIVALENCE_RULE_INDICES = set()
-# java_24 has no visitAssignment-style rewrite wired up in Visitors.py yet
-# (java_20's ASIGN_OP_NORMALIZED is empty too -- this knob isn't populated
-# for either language currently), so this mirrors that empty state rather
-# than pointing at a rule that doesn't get used.
-RULE_ASSIGNMENT = None
+# A hashed rule is NOT collapsed if its subtree contains one of these (e.g. a
+# lambda or switch expression with a block body).
+STRUCTURAL_RULE_INDICES = {
+    Java24Parser.RULE_block,
+    Java24Parser.RULE_switchBlockStatementGroup,
+    Java24Parser.RULE_switchLabeledRule,
+    Java24Parser.RULE_switchExpression,
+    Java24Parser.RULE_catchClause,
+    Java24Parser.RULE_finallyBlock,
+    Java24Parser.RULE_methodDeclaration,
+    Java24Parser.RULE_constructorDeclaration,
+    Java24Parser.RULE_genericMethodDeclaration,
+    Java24Parser.RULE_genericConstructorDeclaration,
+    Java24Parser.RULE_compactConstructorDeclaration,
+    Java24Parser.RULE_classBody,
+    Java24Parser.RULE_classDeclaration,
+    Java24Parser.RULE_interfaceDeclaration,
+    Java24Parser.RULE_interfaceBody,
+    Java24Parser.RULE_enumDeclaration,
+    Java24Parser.RULE_recordDeclaration,
+    Java24Parser.RULE_recordBody,
+    Java24Parser.RULE_methodBody,
+    Java24Parser.RULE_lambdaBody,
+    Java24Parser.RULE_annotationTypeBody,
+    Java24Parser.RULE_typeDeclaration,
+    Java24Parser.RULE_compilationUnit,
+    SYNTHETIC_IF_STMT,
+    SYNTHETIC_FOR_STMT,
+    SYNTHETIC_WHILE_STMT,
+    SYNTHETIC_DO_STMT,
+    SYNTHETIC_TRY_STMT,
+    SYNTHETIC_SWITCH_STMT,
+    SYNTHETIC_SYNC_STMT,
+    SYNTHETIC_LABELED_STMT,
+}
+
+# `for` and `while` are interchangeable ways to write the same loop (a common
+# clone rewrite), so they share one label; do-while keeps its own.
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    SYNTHETIC_FOR_STMT: "LOOP",
+    SYNTHETIC_WHILE_STMT: "LOOP",
+}
+RULE_ASSIGNMENT = SYNTHETIC_ASSIGNMENT_EXPR
 ASIGN_OP_NORMALIZED = dict()
 
-# Direct java_20 equivalents that exist in java_24 with the same scope:
-# identifiers/type-parameter machinery whose specific choice doesn't reflect
-# an algorithmic difference (same "static container" reasoning as java_20's
-# entries), plus a handful of always-mandatory wrapper rules.
+# `x op= y` is rebuilt as `x = x op y` (Java24ParserVisitorExtended): the
+# augmented token -> the binary operator token of the expanded form. Shifts are
+# left alone (`>>` is several tokens in this grammar).
+AUG_ASSIGN_OPS = {
+    Java24Lexer.ADD_ASSIGN: Java24Lexer.ADD,
+    Java24Lexer.SUB_ASSIGN: Java24Lexer.SUB,
+    Java24Lexer.MUL_ASSIGN: Java24Lexer.MUL,
+    Java24Lexer.DIV_ASSIGN: Java24Lexer.DIV,
+    Java24Lexer.MOD_ASSIGN: Java24Lexer.MOD,
+    Java24Lexer.AND_ASSIGN: Java24Lexer.BITAND,
+    Java24Lexer.OR_ASSIGN: Java24Lexer.BITOR,
+    Java24Lexer.XOR_ASSIGN: Java24Lexer.CARET,
+}
+
+# Only identifier text is noise (the old set also dropped types, annotations,
+# for-init, resources and -- via SYNTHETIC_ASSIGNMENT_EXPR -- every assignment).
 EXCLUDED_RULE_TYPES = {
     Java24Parser.RULE_identifier,
     Java24Parser.RULE_typeIdentifier,
-    Java24Parser.RULE_typeArguments,
-    Java24Parser.RULE_typeArgument,
-    Java24Parser.RULE_typeParameters,
-    Java24Parser.RULE_typeParameter,
-    Java24Parser.RULE_variableDeclaratorId,
-    Java24Parser.RULE_annotation,
-    Java24Parser.RULE_catchType,
-    Java24Parser.RULE_finallyBlock,
-    Java24Parser.RULE_resourceSpecification,
-    # java_20 equivalent: forInit. java_24 keeps this as its own distinct
-    # rule (unlike assignment), so no relabeling needed -- direct port.
-    Java24Parser.RULE_forInit,
-    # Engine-assisted: see relabel_node() above. Not a real grammar rule --
-    # a synthetic id assigned to assignment-shaped `expression` nodes by
-    # both the Python visitor (via relabel_node) and the native bridge
-    # (csim/native/src/java_24_bridge.cpp), so this entry can drop them the
-    # same way java_20's EXCLUDED_RULE_TYPES drops its separate
-    # `assignment` rule.
-    SYNTHETIC_ASSIGNMENT_EXPR,
+    # Modifiers (`public`, `static`, `final`, ...): declaration boilerplate that
+    # differs between equivalent programs and that java_20 folds into its hashed
+    # methodHeader. Without this a wrapped/extracted method scores ~0.64 instead
+    # of ~0.7+ on the controlled clone set (see docs/pruning_fidelity.md).
+    Java24Parser.RULE_classOrInterfaceModifier,
+    Java24Parser.RULE_modifier,
 }
-
-# A second pass (2026-08-12) tried mapping the rest of java_20's 65-entry
-# EXCLUDED_RULE_TYPES by grammar semantics -- unifying its per-context
-# modifier rules (classModifier/fieldModifier/methodModifier/...) into
-# java_24's shared `modifier`/`classOrInterfaceModifier`, plus a dozen
-# direct 1:1 rule-name matches (receiverParameter, variableModifier,
-# recordHeader, switchLabel, catchClause, ...). Measured on the real corpus
-# (jv_dataset/all_java/1037) it was a NET REGRESSION, not an improvement:
-# the known-duplicate pairs' similarity dropped from 0.94 to 0.83, while the
-# worst unrelated-pair score rose from 0.95 to 0.90 -- MORE overlap between
-# the two distributions, not less. Excluding more nodes shrinks every tree,
-# but shrinks the true-duplicate pairs' remaining (already-small) edit
-# distance's DENOMINATOR faster than its numerator, which can make relative
-# similarity go down even as absolute differences stay flat. This is exactly
-# why java_20's own config was built through per-candidate, corpus-measured
-# safety+efficacy checks (see the corpus-tuner tooling referenced in
-# csim_native_parsers project memory) rather than by porting entries in
-# batches and eyeballing the aggregate effect -- each entry's interaction
-# with every other needs individual verification. Reverted; left as a
-# documented note rather than silently dropped, since the specific mappings
-# identified (modifier unification, receiverParameter, variableModifier,
-# recordHeader/recordComponentList/recordComponent, interfaceMethodModifier,
-# defaultValue, switchBlockStatementGroup, switchLabel, catchClause,
-# constDeclaration, typeTypeOrVoid for java_20's `result`, typeList for
-# `interfaceTypeList`) are still valid CANDIDATES for a future corpus-tuner
-# pass -- they were reverted for lacking verified safety, not for being
-# wrong mappings.

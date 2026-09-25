@@ -12,15 +12,16 @@ Selection, per problem:
   2. drop duplicates -- two files are duplicates when their raw ANTLR trees have the same
      shape (same sequence of rule/token types), i.e. they differ only in identifier names,
      literals, comments or whitespace;
-  3. drop trivial programs (--min-nodes) and size outliers (above Q3 + 3*IQR, e.g. an exercise
-     that builds a huge array literal), then keep exactly --target files, spread over the
+  3. drop programs that build a big collection literal (--max-literal elements: hard-coded
+     tables of primes, arrays or maps -- data, not structure), then trivial programs
+     (--min-nodes) and size outliers (above Q3 + 3*IQR *in each grammar*), then keep exactly --target files, spread over the
      problems and, inside each problem, across the size range.
 
 Usage:
     python select_files.py <dataset_dir> <lang> <out.csv> [--target 1000] [--also-check lang ...]
 
 `lang` only selects the parser used for the duplicate/syntax checks. Output columns:
-dataset,problem,file,lines,raw_nodes
+dataset,problem,file,lines,raw_nodes_<grammar> (one column per grammar checked)
 """
 
 import argparse
@@ -52,8 +53,28 @@ def raw_shape(tree):
     return hashlib.sha1(repr(labels).encode()).hexdigest(), len(labels) // 2
 
 
+def has_big_literal(text, limit):
+    """True when the program builds a collection literal (list/tuple/set/dict display) with at least
+    `limit` elements -- e.g. a hard-coded table of primes. Those exercises are mostly data, and their
+    trees are huge without saying anything about the program's structure."""
+    import ast
+
+    try:
+        module = ast.parse(text)
+    except (SyntaxError, ValueError, RecursionError):
+        module = None
+    if module is None:  # ast can't read it (e.g. Python 2 code): fall back to counting commas per line
+        return any(line.count(",") >= limit for line in text.splitlines())
+    for node in ast.walk(module):
+        if isinstance(node, (ast.List, ast.Tuple, ast.Set)) and len(node.elts) >= limit:
+            return True
+        if isinstance(node, ast.Dict) and len(node.keys) >= limit:
+            return True
+    return False
+
+
 def analyse(path, lang, also=()):
-    """(shape_hash, raw_nodes, lines) or None when the file is unusable.
+    """(shape_hash, {grammar: raw_nodes}, lines, text) or None when the file is unusable.
 
     Unusable = unreadable, empty, or with a syntax error in `lang` or in any grammar of `also`.
     """
@@ -63,25 +84,21 @@ def analyse(path, lang, also=()):
         return None
     if not text.strip():
         return None
-    errors = io.StringIO()
-    try:
-        with contextlib.redirect_stderr(errors):
-            tree = ANTLR_parse(str(path), text, lang)
-    except Exception:
-        return None
-    if errors.getvalue():
-        return None
-    for other in also:
+    shape, counts = None, {}
+    for grammar in (lang, *also):
         errors = io.StringIO()
         try:
             with contextlib.redirect_stderr(errors):
-                ANTLR_parse(str(path), text, other)
+                tree = ANTLR_parse(str(path), text, grammar)
         except Exception:
             return None
         if errors.getvalue():
             return None
-    shape, nodes = raw_shape(tree)
-    return shape, nodes, text.count("\n") + 1
+        digest, nodes = raw_shape(tree)
+        counts[grammar] = nodes
+        if shape is None:
+            shape = digest
+    return shape, counts, text.count("\n") + 1, text
 
 
 def spread(items, k):
@@ -122,50 +139,68 @@ def main():
     ap.add_argument("--target", type=int, default=1000, help="number of files to select (a round number)")
     ap.add_argument("--min-nodes", type=int, default=40, help="drop trivial programs below this many raw nodes")
     ap.add_argument("--fence", type=float, default=3.0, help="drop outliers above Q3 + fence * IQR of raw nodes")
+    ap.add_argument("--max-literal", type=int, default=20,
+                    help="drop programs with a list/tuple/set/dict literal of at least this many elements")
     args = ap.parse_args()
 
     root = Path(args.dataset)
     ext = {"python_3_13": ".py", "python_3": ".py", "java_20": ".java", "java_24": ".java",
            "cpp_14": ".cpp", "c": ".c", "kotlin": ".kt"}[args.lang]
+    grammars = [args.lang, *args.also_check]
 
     # 1. unique, cleanly parsed programs per problem
     pool = {}
     seen_global = set()
+    dropped_literal = 0
     for problem in sorted(p for p in root.iterdir() if p.is_dir() and not p.name.startswith(("_", "."))):
         unique = {}
         for f in sorted(problem.glob(f"*{ext}")):
             info = analyse(f, args.lang, args.also_check)
             if info is None:
                 continue
-            shape, nodes, lines = info
+            shape, counts, lines, text = info
             if shape in unique or shape in seen_global:
                 continue
-            unique[shape] = (nodes, lines, f.name)
+            if has_big_literal(text, args.max_literal):
+                dropped_literal += 1
+                seen_global.add(shape)
+                continue
+            unique[shape] = (counts, lines, f.name)
         seen_global.update(unique)
-        pool[problem.name] = sorted(unique.values())
+        pool[problem.name] = list(unique.values())
     total_unique = sum(len(v) for v in pool.values())
 
-    # 2. drop trivial programs and size outliers (e.g. a hard-coded array of N literals)
-    sizes_all = sorted(n for v in pool.values() for n, _, _ in v)
-    q1, q3 = sizes_all[len(sizes_all) // 4], sizes_all[3 * len(sizes_all) // 4]
-    upper = q3 + args.fence * (q3 - q1)
-    pool = {p: [c for c in v if args.min_nodes <= c[0] <= upper] for p, v in pool.items()}
-    pool = {p: v for p, v in pool.items() if v}
+    # 2. drop trivial programs and size outliers, judged in EVERY grammar (a grammar with a deeper tree
+    #    reaches a large count first, so a fence computed on one grammar leaves the others' tail in)
+    limits = {}
+    for g in grammars:
+        sizes = sorted(c[0][g] for v in pool.values() for c in v)
+        q1, q3 = sizes[len(sizes) // 4], sizes[3 * len(sizes) // 4]
+        limits[g] = q3 + args.fence * (q3 - q1)
+
+    def acceptable(c):
+        return all(args.min_nodes <= c[0][g] <= limits[g] for g in grammars)
+
+    before_filter = total_unique
+    pool = {p: [c for c in v if acceptable(c)] for p, v in pool.items()}
+    pool = {p: sorted(v, key=lambda c: c[0][args.lang]) for p, v in pool.items() if v}
     kept = sum(len(v) for v in pool.values())
 
     # 3. exactly `target` files, spread over problems and over the size range
     quota = quotas({p: len(v) for p, v in pool.items()}, args.target)
     rows = []
     for problem, cands in pool.items():
-        for nodes, lines, name in spread(cands, quota[problem]):
-            rows.append((root.name, problem, name, lines, nodes))
+        for counts, lines, name in spread(cands, quota[problem]):
+            rows.append((root.name, problem, name, lines, *(counts[g] for g in grammars)))
 
     with open(args.out, "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["dataset", "problem", "file", "lines", "raw_nodes"])
+        w.writerow(["dataset", "problem", "file", "lines", *(f"raw_nodes_{g}" for g in grammars)])
         w.writerows(rows)
+    limit_text = ", ".join(f"{g} <= {limits[g]:.0f}" for g in grammars)
     print(f"{args.out}: {len(rows)} files from {len({r[1] for r in rows})} problems "
-          f"(unique {total_unique}, after outlier filter {kept}, raw nodes {args.min_nodes}..{upper:.0f})")
+          f"(clean & unique {before_filter + dropped_literal}, big-literal programs dropped {dropped_literal}, "
+          f"after size filter {kept}; raw-node limits: {limit_text}, min {args.min_nodes})")
 
 
 if __name__ == "__main__":

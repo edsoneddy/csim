@@ -38,7 +38,8 @@ def nodes_section():
         "",
         f"Sample: **{len(selected)} programs** from `all_py` ({len({r['problem'] for r in selected})} problems pooled), "
         "duplicate-free (same raw ANTLR tree shape counted once), without syntax errors in either grammar, "
-        "trivial programs and size outliers removed. *Before* = nodes of the raw ANTLR tree; *after* = nodes of the "
+        "programs that hard-code a collection literal of 20+ elements, trivial programs and size outliers "
+        "(judged in each grammar) removed. *Before* = nodes of the raw ANTLR tree; *after* = nodes of the "
         "normalized, pruned and hashed tree given to the tree edit distance.",
         "",
         "| Grammar | Programs | Before (mean / median / p90 / max) | After (mean / median / p90 / max) | Mean reduction | Median per-program ratio | Left with 1 node |",
@@ -57,17 +58,15 @@ def nodes_section():
     lines += [
         "",
         "Figures come from `nodes_reduction/nodes_reduction.ipynb`, one image per chart in "
-        "`nodes_reduction/results/`. Per grammar: distribution on a log scale, distribution on the real node "
-        "count, and a per-program scatter (before vs. after).",
+        "`nodes_reduction/results/`, all on the real (linear) node count. Per grammar: the distribution and a "
+        "per-program scatter (before vs. after).",
         "",
     ]
     for lang in LANGS:
         lines += [
             f"### `{lang}`",
             "",
-            f"![log scale](nodes_reduction/results/nodes_hist_log_{lang}.png)",
-            "",
-            f"![real scale](nodes_reduction/results/nodes_hist_real_{lang}.png)",
+            f"![distribution](nodes_reduction/results/nodes_hist_real_{lang}.png)",
             "",
             f"![scatter](nodes_reduction/results/nodes_scatter_{lang}.png)",
             "",

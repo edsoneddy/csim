@@ -57,3 +57,18 @@ optimum around 0.4-0.6. Cost was left at 0.5.
   the hash covers token/rule labels, not text.
 * ~4-7% of pairs still cross the 0.8 grouping threshold differently than R0
   (R1, exclusions alone, already flips ~4%).
+
+## Interaction with the other normalizations (3.4.0)
+
+Three normalizations sit next to the hashing change and were re-measured
+together (same three problem sets, `python_3`/`python_3_13` MAE 0.075-0.098,
+compression ~7x):
+
+* **Augmented assignment** is rewritten to the tree of its expanded form, so
+  it is neutral for fidelity by construction (see CHANGELOG).
+* **`for` == `while`**: `test/controlled` (hand-made clones, incl. a `for` ->
+  `while` rewrite and a `+=` rewrite) needs it to reach >= 0.7 on 34-35 of 36
+  pairs. This is deliberate normalization, so it is a *designed* deviation from
+  the near-raw reference, which keeps loop kinds distinct.
+* **Loop variable and `def`/`class` keywords** are dropped: identifier-like
+  or redundant with the rule label.

@@ -78,7 +78,13 @@ class Python3LexerBase(Lexer):
             self.__process_new_line(0)
 
     def HandleSpaces(self) -> None:
-        next_char: str = chr(self._input.LA(1))
+        c = self._input.LA(1)
+        if c == -1:
+            # Trailing whitespace at EOF: nothing follows, so there is no
+            # indentation to compute (chr(-1) would raise ValueError).
+            self.__emit_token_type_on_channel(self.WS, self.HIDDEN, self.text)
+            return
+        next_char: str = chr(c)
 
         if ((self.__last_token is None or self.__last_token.type == self.NEWLINE) and
                 self.__is_not_new_line_or_comment(next_char)):

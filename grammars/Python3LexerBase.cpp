@@ -90,6 +90,12 @@ void Python3LexerBase::HandleNewLine()
 
 void Python3LexerBase::HandleSpaces()
 {
+	if (_input->LA(1) == antlr4::Token::EOF)
+	{
+		// Trailing whitespace at EOF: no indentation to compute.
+		Emit(Python3Lexer::WS, Python3Lexer::HIDDEN, getText());
+		return;
+	}
 	char next = (char) _input->LA(1);
 
 	if ((_lastTokenNull || _lastTokenType == Python3Lexer::NEWLINE) && IsNotNewLineOrComment(next))

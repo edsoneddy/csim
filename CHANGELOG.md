@@ -3,7 +3,7 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
-## [Unreleased]
+## [Unreleased] (3.4.0)
 
 ### Less aggressive pruning for `python_3` and `python_3_13`
 
@@ -12,9 +12,36 @@ hashed, and `try/except/finally`, `elif`/`else` (and `raise`/`assert`/
 `with_item` in `python_3_13`) are no longer excluded. Previously a program
 that was a single loop became one node (median compression ~30x). Measured on
 3 disjoint sets of 12 real `all_py` problems, the mean error of the similarity
-index vs. the unpruned tree drops from ~0.14-0.18 to ~0.08-0.09 at ~5-6x
-compression. Similarity scores change accordingly (e.g. `for` vs `while`
-0.83 -> 0.56-0.60). Method and numbers: `docs/pruning_fidelity.md`.
+index vs. the unpruned tree drops from ~0.14-0.18 to ~0.08-0.09 at ~6-7x
+compression. Method and numbers: `docs/pruning_fidelity.md`.
+
+### Fixed: augmented assignment normalization (`x += y` vs `x = x + y`)
+
+The rewrite in `python_3_13` built a tree of a different shape than the
+naturally-parsed `x = x + y` (one child instead of two, and the reused target
+kept the target rule instead of the expression rule), so the two never hashed
+equal. It now re-emits the target as its right-hand-side twin (`atom`, or the
+`primary` chain for `a[i]` / `self.x`) and adds the `star_targets` child.
+`python_3` had no rewrite at all; it now gets the same one (done in `visit()`,
+so the native parser path sees it too). Covered for all 13 operators plus
+subscript/attribute targets in `test/test_augmented_assignment.py`.
+
+### Fixed: `python_3` lexer crash on trailing whitespace at EOF
+
+`Python3LexerBase.HandleSpaces` called `chr(-1)` when a file ended in spaces
+(`ValueError: chr() arg not in range`), making `Compare` return `None`. Fixed in
+the Python lexer base and in `grammars/Python3LexerBase.cpp` (the C++ change
+needs a native rebuild to take effect).
+
+### Restored: `for` / `while` equivalence (as in 2.0.0)
+
+Both loop kinds share the `LOOP` label again (`CONTROL_EQUIVALENCE_RULE_INDICES`),
+and the loop variable / `for`/`while`/`in` keywords no longer add a node. On
+the hand-made clone set (`test/controlled`, 36 all-vs-all pairs, all clones)
+36 -> 35 (`python_3`) and 34 (`python_3_13`) pairs score >= 0.7, 2.0.0: 34.
+`python_3` also drops the `def`/`class` keywords and hashes `def_parameters`,
+as `python_3_13` already did. Trade-off: `for` vs `while` no longer costs a
+full mismatch.
 
 ## [3.3.0]
 

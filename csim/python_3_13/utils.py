@@ -74,6 +74,10 @@ EXCLUDED_TOKEN_TYPES = {
 EXCLUDE_CHILDRENS_FROM_RULE = {
     PythonParser.RULE_for_stmt: [
         PythonLexer.IN + TOKEN_TYPE_OFFSET,
+        # The loop variable: like every other identifier it carries no
+        # algorithmic meaning, and dropping it makes `for i in ...` line up
+        # with the `while` form (see CONTROL_EQUIVALENCE_RULE_INDICES).
+        PythonParser.RULE_star_targets,
     ],
 }
 COLLAPSED_RULE_INDICES = {
@@ -134,7 +138,13 @@ HASHED_RULE_INDICES = {
     # similarity index vs. the unpruned tree). Leaves stay hashed: ~6x
     # compression at ~half the error. See docs/pruning_fidelity.md.
 }
-CONTROL_EQUIVALENCE_RULE_INDICES = {}
+# `for` and `while` are interchangeable ways to write the same loop (the
+# jv-umsa-dataset/controlled clones rewrite one as the other), so both get the
+# same label. Restores the 2.0.0 behaviour that the batch-tuner era dropped.
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    PythonParser.RULE_for_stmt: "LOOP",
+    PythonParser.RULE_while_stmt: "LOOP",
+}
 RULE_ASSIGNMENT = PythonParser.RULE_assignment
 ASIGN_OP_NORMALIZED = {
     "+=": [

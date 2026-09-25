@@ -2,6 +2,7 @@ from .Python3Lexer import Python3Lexer
 from .Python3Parser import Python3Parser
 from antlr4 import Token
 from antlr4.tree.Tree import TerminalNode
+from ..utils import TOKEN_TYPE_OFFSET
 
 # Synthetic rule ids for hub-rule alternatives that need a strategy or a
 # rule identity DIFFERENT from the rest of their shared rule index -- see
@@ -159,9 +160,24 @@ EXCLUDED_TOKEN_TYPES = {
     Python3Lexer.AS,
     # Return-type-annotation arrow
     Python3Lexer.ARROW,
+    # Definition keywords: the funcdef/classdef rule already says which one it
+    # is (python_3_13 drops them for the same reason).
+    Python3Lexer.DEF,
+    Python3Lexer.CLASS,
 }
 
-EXCLUDE_CHILDRENS_FROM_RULE = dict()
+# Loop keywords/`in` add nothing once `for`/`while` share the LOOP label (see
+# CONTROL_EQUIVALENCE_RULE_INDICES); without this a `for` and a `while` would
+# still differ by their keyword leaf.
+EXCLUDE_CHILDRENS_FROM_RULE = {
+    SYNTHETIC_FOR_STMT: [
+        Python3Lexer.FOR + TOKEN_TYPE_OFFSET,
+        Python3Lexer.IN + TOKEN_TYPE_OFFSET,
+    ],
+    SYNTHETIC_WHILE_STMT: [
+        Python3Lexer.WHILE + TOKEN_TYPE_OFFSET,
+    ],
+}
 
 # Import machinery: which specific names were imported doesn't reflect an
 # algorithmic difference (same "static container" reasoning as
@@ -211,6 +227,9 @@ HASHED_RULE_INDICES = {
     Python3Parser.RULE_comparison,
     Python3Parser.RULE_logical_test,
     Python3Parser.RULE_small_stmt,
+    # Parameter lists: names are noise, the arity/shape survives in the digest
+    # (python_3_13 hashes `parameters`/`param` for the same reason).
+    Python3Parser.RULE_def_parameters,
     # Compound statements (if/while/for/with/def/class) are deliberately NOT
     # hashed: their body is the program's control-flow skeleton, and hashing
     # them turned whole programs into 1-5 nodes (median 24x compression,
@@ -222,14 +241,41 @@ HASHED_RULE_INDICES = {
     # without hashing anything.
 }
 
-CONTROL_EQUIVALENCE_RULE_INDICES = set()
+# `for` and `while` are interchangeable ways to write the same loop (the
+# jv-umsa-dataset/controlled clones rewrite one as the other), so both get the
+# same label; mirrors python_3_13 and the 2.0.0 behaviour.
+CONTROL_EQUIVALENCE_RULE_INDICES = {
+    SYNTHETIC_FOR_STMT: "LOOP",
+    SYNTHETIC_WHILE_STMT: "LOOP",
+}
 # No visitAssignment-style rewrite wired up in Visitors.py for this language
 # yet (matching java_24's current state).
 RULE_ASSIGNMENT = None
 ASIGN_OP_NORMALIZED = dict()
 
+# Augmented-assignment token -> the binary operator token of its expanded
+# form (`x += y` == `x = x + y`), used by Python3ParserVisitorExtended in
+# Visitors.py. Values are the operator tokens of the `expr` rule.
+AUG_ASSIGN_OPS = {
+    Python3Lexer.ADD_ASSIGN: Python3Lexer.ADD,
+    Python3Lexer.SUB_ASSIGN: Python3Lexer.MINUS,
+    Python3Lexer.MULT_ASSIGN: Python3Lexer.STAR,
+    Python3Lexer.AT_ASSIGN: Python3Lexer.AT,
+    Python3Lexer.DIV_ASSIGN: Python3Lexer.DIV,
+    Python3Lexer.MOD_ASSIGN: Python3Lexer.MOD,
+    Python3Lexer.AND_ASSIGN: Python3Lexer.AND_OP,
+    Python3Lexer.OR_ASSIGN: Python3Lexer.OR_OP,
+    Python3Lexer.XOR_ASSIGN: Python3Lexer.XOR,
+    Python3Lexer.LEFT_SHIFT_ASSIGN: Python3Lexer.LEFT_SHIFT,
+    Python3Lexer.RIGHT_SHIFT_ASSIGN: Python3Lexer.RIGHT_SHIFT,
+    Python3Lexer.POWER_ASSIGN: Python3Lexer.POWER,
+    Python3Lexer.IDIV_ASSIGN: Python3Lexer.IDIV,
+}
+
 EXCLUDED_RULE_TYPES = {
     # Identifier nodes: which name was chosen doesn't reflect an
     # algorithmic difference.
     Python3Parser.RULE_name,
+    # The `for` loop variable list (also `del` targets): identifiers only.
+    Python3Parser.RULE_exprlist,
 }

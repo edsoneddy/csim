@@ -3,7 +3,17 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
-## [Unreleased] (3.4.0)
+## [3.4.1]
+
+### New: `csim.count_nodes`
+
+`count_nodes(file_name, file_content, lang)` returns `(nodes_before, nodes_after)`: the size
+of the raw ANTLR parse tree and of the normalized, pruned and hashed tree that is given to
+the tree edit distance (the number `csim tree` prints as "Total nodes after pruning"). It
+works for every language, with the native and the pure-Python parsers. No other change since
+3.4.0.
+
+## [3.4.0]
 
 ### Less aggressive pruning for `python_3` and `python_3_13`
 

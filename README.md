@@ -324,6 +324,16 @@ similarity = Compare(name_a='example A', content_a=code_a, name_b='example B', c
 print(f"Similarity: {similarity}") # Output: Similarity: X.XX
 ```
 
+To see how much a program shrinks when it is normalized, pruned and hashed, count its nodes before and after:
+
+```python
+from csim import count_nodes
+
+nodes_before, nodes_after = count_nodes("example.py", code, lang="python_3_13")
+```
+
+`nodes_before` is every node of the raw ANTLR parse tree; `nodes_after` is the size of the tree handed to the tree edit distance (the same number `csim tree` prints as "Total nodes after pruning").
+
 ## Documentation
 
 - [Getting Started Guide](GETTING_STARTED.md) - Quick tutorial for new users

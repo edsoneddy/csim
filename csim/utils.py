@@ -506,6 +506,38 @@ def preprocess_code(file_name, file_content, lang="python_3_13"):
     return pruned_tree, pruned_count
 
 
+def count_nodes(file_name, file_content, lang="python_3_13"):
+    """Count the nodes of a program before and after pruning.
+
+    Args:
+        file_name (str): Name of the file (used only for syntax-error messages).
+        file_content (str): Source code.
+        lang (str): Programming language identifier.
+
+    Returns:
+        tuple[int, int]: (nodes_before, nodes_after). `nodes_before` is every
+        node of the raw ANTLR parse tree (rules and tokens); `nodes_after` is
+        the size of the normalized, pruned and hashed tree that is handed to
+        the tree edit distance -- the same number `csim tree` prints as
+        "Total nodes after pruning".
+    """
+    # Local import to avoid circular dependency at module import time
+    from .CodeSimilarity import ANTLR_parse, Normalize, PruneAndHash
+
+    tree = ANTLR_parse(file_name, file_content, lang)
+
+    # Iterative: real programs can nest deeper than the recursion limit.
+    before = 0
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        before += 1
+        stack.extend(node.getChild(i) for i in range(node.getChildCount()))
+
+    _, after = PruneAndHash(Normalize(tree, lang), lang)
+    return before, after
+
+
 def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):
     N1, len_N1 = proccesed_code1
     N2, len_N2 = proccesed_code2

@@ -116,3 +116,40 @@ def test_cli_group_transitive_cluster(tmp_path: Path):
     assert "b.py" in result.stdout
     assert "c.py" in result.stdout
     assert "d.py" in result.stdout
+
+
+def test_cli_index_formula():
+    """
+    Testing that --index selects the similarity index formula, and that the
+    'ratio' default puts the same pair on a higher scale than 'legacy'.
+    """
+    test_dir = "test/files/"
+
+    # Run the working tree rather than CSIM_EXECUTABLE, which resolves to
+    # whatever csim is installed in the environment.
+    def scores(*extra):
+        command = [sys.executable, "-m", "csim.main", "report", "-p", test_dir,
+                   "-l", "python_3", *extra]
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        assert result.returncode == 0, f"CLI failed. Error: {result.stderr}"
+        return [
+            float(line.rsplit(": ", 1)[1])
+            for line in result.stdout.splitlines()
+            if "similarity index" in line
+        ]
+
+    default = scores()
+    ratio = scores("-ix", "ratio")
+    legacy = scores("--index", "legacy")
+
+    assert default and default == ratio, "'ratio' should be the default formula"
+    assert all(r >= l for r, l in zip(ratio, legacy)), "ratio rescales legacy upwards"
+    assert ratio != legacy, "the two formulas should not produce identical output"
+
+    bad = subprocess.run(
+        [sys.executable, "-m", "csim.main", "report", "-p", test_dir, "-ix", "nope"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert bad.returncode != 0, "an unknown --index value should be rejected"

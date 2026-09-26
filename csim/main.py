@@ -2,6 +2,7 @@ import argparse
 import os
 from .language.parser import ANTLR_parse
 from .processing.tree_processing import Normalize, PruneAndHash
+from .processing.distance_metrics import DEFAULT_INDEX_FORMULA, INDEX_FORMULAS
 from .utils import (
     count_tree_nodes,
     group_by_exhaustive_search,
@@ -75,6 +76,7 @@ def main():
         --path, -p (str): Path to a directory containing source code files (required).
         --lang, -l (str): The programming language of the source files (default: 'python_3_13').
         --talg, -ta (str): The tree edit distance algorithm to use (default: 'apted').
+        --index, -ix (str): Similarity index formula: 'ratio' (default), 'metric' or 'legacy'.
 
     Arguments for 'group' action:
         --path, -p (str): Path to a directory containing source code files (required).
@@ -82,6 +84,8 @@ def main():
         --strategy, -s (str): Grouping strategy: 'exhaustive' (default).
         --lang, -l (str): The programming language of the source files (default: 'python_3_13').
         --talg, -ta (str): The tree edit distance algorithm to use (default: 'apted').
+        --index, -ix (str): Similarity index formula: 'ratio' (default), 'metric' or 'legacy'.
+            Thresholds are scale-dependent: legacy 0.70 == ratio 0.769.
 
     Arguments for 'tree'/'view' action:
         --path, -p (str): Path to a single source code file (required).
@@ -128,6 +132,19 @@ def main():
         choices=["zss", "apted"],
         default="apted",
         help="The tree edit distance algorithm to use (default: apted).",
+    )
+
+    # How the edit distance is normalized into the similarity index
+    parser.add_argument(
+        "--index",
+        "-ix",
+        choices=list(INDEX_FORMULAS),
+        default=DEFAULT_INDEX_FORMULA,
+        help="Similarity index formula (default: %(default)s). 'ratio' = "
+        "max/(max+d); 'metric' = (n1+n2-d)/(n1+n2+d); 'legacy' = 1-d/max, the "
+        "index of csim <= 3.4.2. 'ratio' ranks pairs exactly as 'legacy' does "
+        "but on a different scale, so thresholds do not carry over: "
+        "legacy 0.70 = ratio 0.769, legacy 0.80 = ratio 0.833.",
     )
 
     # Threshold (only for 'group' action)
@@ -210,11 +227,16 @@ def main():
 
     if args.action == "report":
         results = report_pairwise_similarity(
-            file_names, file_contents, args.lang, args.talg
+            file_names, file_contents, args.lang, args.talg, args.index
         )
     elif args.action == "group":
         results = group_by_exhaustive_search(
-            file_names, file_contents, args.lang, args.threshold, args.talg
+            file_names,
+            file_contents,
+            args.lang,
+            args.threshold,
+            args.talg,
+            index_formula=args.index,
         )
 
     print(results)

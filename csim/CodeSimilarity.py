@@ -1,6 +1,10 @@
 from .language.parser import ANTLR_parse
 from .processing.tree_processing import Normalize, PruneAndHash
-from .processing.distance_metrics import TreeEditDistance, SimilarityIndex
+from .processing.distance_metrics import (
+    DEFAULT_INDEX_FORMULA,
+    SimilarityIndex,
+    TreeEditDistance,
+)
 
 
 def Compare(
@@ -10,6 +14,7 @@ def Compare(
     content_b="",
     lang="python_3_13",
     ted_algorithm="apted",
+    index_formula=DEFAULT_INDEX_FORMULA,
 ):
     """Compare two Python code snippets and compute their similarity.
 
@@ -27,6 +32,9 @@ def Compare(
         content_b: Second Python code snippet as a string.
         lang: Programming language of the code snippets (default is "python_3_13").
         ted_algorithm: The tree edit distance algorithm to use ('zss' or 'apted').
+        index_formula: How to normalize the edit distance into the similarity
+            index: 'ratio' (default), 'metric' or 'legacy'. See
+            processing.distance_metrics.SimilarityIndex.
     Returns:
         float: Similarity score in the range [0, 1], where 1 indicates
                identical code structure and 0 indicates maximum difference.
@@ -49,7 +57,7 @@ def Compare(
         d = TreeEditDistance(PT1, PT2, ted_algorithm=ted_algorithm)
 
         # Calculate and return normalized similarity index
-        s = SimilarityIndex(d, len_PT1, len_PT2)
+        s = SimilarityIndex(d, len_PT1, len_PT2, index_formula=index_formula)
     except Exception as e:
         print(f"Error during comparison: {e}")
         s = None

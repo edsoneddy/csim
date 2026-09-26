@@ -15,13 +15,20 @@ def test_identical_python_3_13_code():
 
 def test_different_python_3_13_code():
     """
-    Tests that two completely different Python 3.13 code snippets have a low similarity.
+    Tests that two completely different Python 3.13 code snippets have a low
+    similarity. The bound is scale-dependent: 'ratio' is max/(max+d), so a pair
+    with no structure in common sits near 0.5, not near 0.
     """
     code_a = "x = 1\nprint(x)"
     code_b = "def my_func():\n    return 'hello'"
     similarity = Compare(content_a=code_a, content_b=code_b, lang="python_3_13")
     assert similarity is not None
-    assert similarity < 0.5
+    assert similarity <= 0.5
+
+    legacy = Compare(
+        content_a=code_a, content_b=code_b, lang="python_3_13", index_formula="legacy"
+    )
+    assert legacy < 0.5
 
 
 def test_structurally_similar_python_3_13_code():
@@ -64,6 +71,43 @@ def test_apted_algorithm():
         content_a=code_a, content_b=code_b, lang="python_3_13", ted_algorithm="apted"
     )
     assert similarity is not None
+
+
+def test_index_formulas():
+    """
+    Tests the three similarity index formulas against their definitions, and
+    that an unknown one is rejected.
+    """
+    import pytest
+
+    from csim import INDEX_FORMULAS, SimilarityIndex
+
+    assert INDEX_FORMULAS == ("ratio", "metric", "legacy")
+
+    # d = 0 means identical trees on every scale.
+    for formula in INDEX_FORMULAS:
+        assert SimilarityIndex(0, 10, 10, index_formula=formula) == 1.0
+
+    # max = 20, total = 30, d = 5
+    assert SimilarityIndex(5, 10, 20, index_formula="ratio") == round(20 / 25, 2)
+    assert SimilarityIndex(5, 10, 20, index_formula="metric") == round(25 / 35, 2)
+    assert SimilarityIndex(5, 10, 20, index_formula="legacy") == round(1 - 5 / 20, 2)
+
+    # 'legacy' is the default of csim <= 3.4.2; 'ratio' is the default now.
+    assert SimilarityIndex(5, 10, 20) == SimilarityIndex(
+        5, 10, 20, index_formula="ratio"
+    )
+
+    # Threshold translation between the two scales of the max family.
+    assert SimilarityIndex(6, 10, 20, index_formula="legacy") == 0.70
+    assert SimilarityIndex(6, 10, 20, index_formula="ratio") == round(1 / (2 - 0.70), 2)
+
+    # 'legacy' needs a fallback denominator once d passes max, 'ratio' does not.
+    assert SimilarityIndex(25, 10, 20, index_formula="legacy") == round(1 - 25 / 30, 2)
+    assert 0.0 < SimilarityIndex(25, 10, 20, index_formula="ratio") < 0.5
+
+    with pytest.raises(ValueError):
+        SimilarityIndex(1, 10, 10, index_formula="nope")
 
 
 def test_report_pairwise_similarity(tmp_path: Path):

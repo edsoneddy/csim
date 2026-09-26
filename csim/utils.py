@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 import os
 from .DataStructures import UFDS as UnionFind
+from .processing.distance_metrics import DEFAULT_INDEX_FORMULA, INDEX_FORMULAS
 
 
 def get_file(file_path):
@@ -566,7 +567,9 @@ def count_nodes(file_name, file_content, lang="python_3_13"):
     return before, count_tree_nodes(pruned)
 
 
-def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):
+def get_similarity_coefficient(
+    proccesed_code1, proccesed_code2, ted_algorithm, index_formula=DEFAULT_INDEX_FORMULA
+):
     N1, len_N1 = proccesed_code1
     N2, len_N2 = proccesed_code2
 
@@ -574,11 +577,13 @@ def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):
     from .CodeSimilarity import SimilarityIndex, TreeEditDistance
 
     d = TreeEditDistance(N1, N2, ted_algorithm)
-    result = SimilarityIndex(d, len_N1, len_N2)
+    result = SimilarityIndex(d, len_N1, len_N2, index_formula=index_formula)
     return result
 
 
-def report_pairwise_similarity(file_names, file_contents, lang, ted_algorithm):
+def report_pairwise_similarity(
+    file_names, file_contents, lang, ted_algorithm, index_formula=DEFAULT_INDEX_FORMULA
+):
 
     file_number = len(file_names)
     proccesed_files = [
@@ -609,7 +614,7 @@ def report_pairwise_similarity(file_names, file_contents, lang, ted_algorithm):
             else:
                 file_b = proccesed_files[j]
                 similarity_index = get_similarity_coefficient(
-                    file_a, file_b, ted_algorithm
+                    file_a, file_b, ted_algorithm, index_formula
                 )
                 similarity_matrix[i + 1][j + 1] = round(similarity_index, 2)
                 similarity_matrix[j + 1][i + 1] = round(similarity_index, 2)
@@ -665,7 +670,13 @@ def get_output_by_group(file_names, groups, similarity_indices, threshold, print
 
 
 def group_by_exhaustive_search(
-    file_names, file_contents, lang, threshold, ted_algorithm, printable_output=True
+    file_names,
+    file_contents,
+    lang,
+    threshold,
+    ted_algorithm,
+    printable_output=True,
+    index_formula=DEFAULT_INDEX_FORMULA,
 ):
 
     file_number = len(file_names)
@@ -683,7 +694,7 @@ def group_by_exhaustive_search(
         for j in range(i + 1, file_number):
             file_b = proccesed_files[j]
             similarity_index = get_similarity_coefficient(
-                file_a, file_b, ted_algorithm
+                file_a, file_b, ted_algorithm, index_formula
             )
             if similarity_index > threshold:
                 grouper.union(i, j)

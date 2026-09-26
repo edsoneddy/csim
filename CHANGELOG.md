@@ -3,6 +3,48 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+## [4.0.0]
+
+### Selectable similarity index, with a new default (**breaking**)
+
+`SimilarityIndex` was `1 - d / max(n1, n2)`, with a fallback to
+`1 - d / (n1 + n2)` whenever `d` passed the bound `max(n1, n2)` does not
+actually impose. The formula is now selectable with `--index` / `-ix` on the
+CLI and `index_formula=` on `Compare`, `report_pairwise_similarity`,
+`group_by_exhaustive_search` and `SimilarityIndex`:
+
+| Value | Formula |
+|---|---|
+| `ratio` (new default) | `max / (max + d)` |
+| `metric` | `(n1 + n2 - d) / (n1 + n2 + d)` |
+| `legacy` | `1 - d / max`, the index of csim <= 3.4.2 |
+
+This is language-independent: it changes only the normalization step, not any
+grammar, normalization or pruning configuration.
+
+**Every score changes.** Consumers that do not pass `index_formula` get the
+new scale, so pinned thresholds must be re-derived. `ratio` is a *monotone
+rescaling* of `legacy` -- both rank pairs identically, and their ROC/AUC are
+the same to the last digit on all six scsc datasets -- so a `legacy` threshold
+translates exactly as `t_ratio = 1 / (2 - t_legacy)`: 0.70 -> 0.769,
+0.80 -> 0.833, 0.90 -> 0.909. Note also that `ratio` does not reach 0 in
+practice: a pair with nothing in common sits near 0.5.
+
+**Why change the default.** `legacy`'s denominator does not bound `d`, so its
+scale has a discontinuity where it swaps denominators (measured: that branch
+fires once in 6642 real pairs). `ratio` removes it, stays in (0, 1] by
+construction, and places a fixed cut of 0.70 at a usable operating point: on
+the scsc datasets, macro F1 at 0.70 goes 0.847 -> 0.867, dataset F goes 0.686
+-> 0.824, and the controlled clone set goes from 34/36 to 36/36 above 0.70,
+with cross-problem false similarity still 0/750.
+
+To be explicit about what this is: since `ratio` and `legacy` rank pairs
+identically, those gains are **recalibration, not better discrimination**. The
+threshold-free AUC is unchanged. `metric` is the one option that ranks
+differently (it normalizes by total size); it is included because it is a
+published metric normalization of tree edit distance and makes the ablation
+citable.
+
 ## [3.4.2]
 
 ### Weighted hashes for `python_3` (partial credit inside hashed subtrees)

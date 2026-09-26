@@ -161,5 +161,53 @@ no gain (0.087-0.100), so the overlap-based substitution is what matters. Seed
 unchanged (~6-7 s).
 
 **What did not change.** Raising recall at 0.70 on L5/L6 would need a
-calibrated (higher) index, not less pruning; that was not done, since it would
-also raise the score of unrelated pairs.
+calibrated (higher) index, not less pruning. That was done in 4.0.0, see below.
+
+## Choosing the similarity index equation (4.0.0)
+
+The remaining L5/L6 gap at 0.70 was the *scale* of the index, so the four
+candidate normalizations were measured under the protocol above (fidelity vs.
+the near-raw tree on seeds 7/11/23), plus cross-problem false similarity,
+the controlled clone set, and the six labeled scsc datasets. With
+`m = max(n1, n2)` and `s = n1 + n2`:
+
+| Equation | MAE (s7/s11/s23) | false >= 0.70 | clones >= 0.70 | macro F1 | F F1 |
+|---|---|---|---|---|---|
+| `legacy` `1 - d/m` | .052 / .061 / .054 | 0/750 | 34/36 | .847 | .686 |
+| `1 - d/s` | .034 / .042 / .033 | 4/750 | 36/36 | .863 | .866 |
+| `metric` `(s-d)/(s+d)` | .037 / .047 / .037 | 0/750 | 36/36 | .853 | .723 |
+| `ratio` `m/(m+d)` | .021 / .026 / .023 | 0/750 | 36/36 | .867 | .824 |
+
+There are only **two ranking families**, not four: `legacy`/`ratio` both
+depend on `d/m` and `1 - d/s`/`metric` both depend on `d/s`, and within a
+family one equation is a monotone rescaling of the other. Unrounded AUC:
+
+| Family | A | B | C | D | E | F | mean |
+|---|---|---|---|---|---|---|---|
+| `legacy` = `ratio` | .9392 | .9931 | .9998 | .9900 | .9584 | **.9722** | .9754 |
+| `1 - d/s` = `metric` | **.9630** | .9946 | .9998 | .9900 | .9584 | .9615 | .9779 |
+
+So the choice splits into two independent decisions: the *denominator*, which
+changes the ranking (a wash -- `s` wins 0.024 of AUC on A, loses 0.011 on F),
+and the *shape of the scale*, which does not change it at all.
+
+`ratio` was made the default: it keeps the ranking csim already had, drops
+`legacy`'s discontinuous fallback branch, and puts a fixed 0.70 at a usable
+operating point. `1 - d/s` was not exposed -- it shares `metric`'s ranking and
+is the only candidate with cross-problem false positives.
+
+**Two caveats, since both matter for how these numbers are read.** The MAE
+column is not comparable *across* scale families: `ratio` is `1/(1+x)` against
+`legacy`'s `1-x`, so it compresses the high-distance end and part of the drop
+is a scale artifact rather than better fidelity. And the argument that
+`legacy` is ill-defined is real but rare: over 6642 measured pairs its
+fallback branch fires exactly once (`d/m = 1.02`).
+
+**What is still out of reach.** The lowest-scoring related pairs in F are the
+`r4` rung, where the algorithm is replaced by a library call (`math.gcd`,
+`heapq.merge`, `bisect.bisect_left`). Those are structurally different
+programs labeled as related because they share the problem and the I/O
+contract; no tree-edit-distance variant reaches them. Sibling canonical
+ordering inside blocks (the standard answer to Faidhi L4 reordering) was also
+prototyped and rejected: it moves F's AUC by +0.004 at best and costs A, B
+and C.

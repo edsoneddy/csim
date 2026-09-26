@@ -114,30 +114,61 @@ def TreeEditDistance(N1, N2, ted_algorithm="apted"):
     return d
 
 
-def SimilarityIndex(d, T1, T2):
+#: Formulas available to SimilarityIndex, see its docstring. "ratio" is the
+#: default since 4.0.0; "legacy" reproduces csim <= 3.4.2.
+INDEX_FORMULAS = ("ratio", "metric", "legacy")
+
+DEFAULT_INDEX_FORMULA = "ratio"
+
+
+def SimilarityIndex(d, T1, T2, index_formula=DEFAULT_INDEX_FORMULA):
     """Calculate the similarity index between two trees.
 
     Normalizes the tree edit distance to a value between 0 and 1, where
     1 indicates identical trees and 0 indicates maximum dissimilarity.
 
+    With `m = max(T1, T2)` and `s = T1 + T2`, the available formulas are:
+
+    * ``ratio`` (default): ``m / (m + d)``. Ranks pairs exactly as ``legacy``
+      does -- it is a monotone rescaling of it, so the ROC/AUC of the two is
+      identical -- but stays in (0, 1] by construction and needs no fallback
+      branch. A fixed cut translates as ``t_ratio = 1 / (2 - t_legacy)``:
+      legacy 0.70 == ratio 0.769, legacy 0.80 == ratio 0.833.
+    * ``metric``: ``(s - d) / (s + d)``, the metric normalization of tree edit
+      distance (Li & Zhang, Front. Comput. Sci. 2011). Satisfies the triangle
+      inequality when all insert/delete costs share one weight. Ranks
+      differently from ``ratio``: it normalizes by the total size of both
+      trees, not by the larger one.
+    * ``legacy``: ``1 - d / m``, the index of csim <= 3.4.2, kept to reproduce
+      earlier results. ``m`` does not actually bound ``d``, so this formula
+      switches denominator to ``s`` above the bound, which makes its scale
+      discontinuous; on 6642 real pairs that branch fires once.
+
     Args:
         d: Tree edit distance between the two trees.
         T1: Number of nodes in the first tree.
         T2: Number of nodes in the second tree.
+        index_formula: One of INDEX_FORMULAS (default: "ratio").
 
     Returns:
-        float: Similarity index in the range [0, 1].
+        float: Similarity index in the range [0, 1], to 2 decimal places.
     """
-    # If edit distance exceeds the bound given by max(T1, T2),
-    # normalize by total nodes to keep the value non-negative.
-    if d > max(T1, T2):
-        s_alt = 1 - (d / max(T1 + T2, 1))
-        s_alt = round(s_alt, 2)
-        return s_alt
-
     m = max(T1, T2)
-    s = 1 - (d / m)
+    total = max(T1 + T2, 1)
+
+    if index_formula == "ratio":
+        s = m / (m + d) if m + d else 1.0
+    elif index_formula == "metric":
+        s = (total - d) / (total + d)
+    elif index_formula == "legacy":
+        # If edit distance exceeds the bound given by max(T1, T2),
+        # normalize by total nodes to keep the value non-negative.
+        s = 1 - (d / total) if d > m else 1 - (d / m)
+    else:
+        raise ValueError(
+            f"Unsupported index_formula: {index_formula}. "
+            f"Supported formulas are {', '.join(INDEX_FORMULAS)}."
+        )
 
     # return similarity index with precision of 2 decimal places
-    s = round(s, 2)
-    return s
+    return round(min(max(s, 0.0), 1.0), 2)

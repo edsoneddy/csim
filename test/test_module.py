@@ -16,19 +16,19 @@ def test_identical_python_3_13_code():
 def test_different_python_3_13_code():
     """
     Tests that two completely different Python 3.13 code snippets have a low
-    similarity. The bound is scale-dependent: 'ratio' is max/(max+d), so a pair
+    similarity. The bound is scale-dependent: under 'ratio' (max/(max+d)) a pair
     with no structure in common sits near 0.5, not near 0.
     """
     code_a = "x = 1\nprint(x)"
     code_b = "def my_func():\n    return 'hello'"
     similarity = Compare(content_a=code_a, content_b=code_b, lang="python_3_13")
     assert similarity is not None
-    assert similarity <= 0.5
+    assert similarity < 0.5
 
-    legacy = Compare(
-        content_a=code_a, content_b=code_b, lang="python_3_13", index_formula="legacy"
+    ratio = Compare(
+        content_a=code_a, content_b=code_b, lang="python_3_13", index_formula="ratio"
     )
-    assert legacy < 0.5
+    assert ratio <= 0.5
 
 
 def test_structurally_similar_python_3_13_code():
@@ -93,9 +93,9 @@ def test_index_formulas():
     assert SimilarityIndex(5, 10, 20, index_formula="metric") == round(25 / 35, 2)
     assert SimilarityIndex(5, 10, 20, index_formula="legacy") == round(1 - 5 / 20, 2)
 
-    # 'legacy' is the default of csim <= 3.4.2; 'ratio' is the default now.
+    # 'legacy' is the default, as in every release except 4.0.0.
     assert SimilarityIndex(5, 10, 20) == SimilarityIndex(
-        5, 10, 20, index_formula="ratio"
+        5, 10, 20, index_formula="legacy"
     )
 
     # Threshold translation between the two scales of the max family.

@@ -76,7 +76,7 @@ def main():
         --path, -p (str): Path to a directory containing source code files (required).
         --lang, -l (str): The programming language of the source files (default: 'python_3_13').
         --talg, -ta (str): The tree edit distance algorithm to use (default: 'apted').
-        --index, -ix (str): Similarity index formula: 'ratio' (default), 'metric' or 'legacy'.
+        --index, -ix (str): Similarity index formula: 'legacy' (default), 'ratio' or 'metric'.
 
     Arguments for 'group' action:
         --path, -p (str): Path to a directory containing source code files (required).
@@ -84,7 +84,7 @@ def main():
         --strategy, -s (str): Grouping strategy: 'exhaustive' (default).
         --lang, -l (str): The programming language of the source files (default: 'python_3_13').
         --talg, -ta (str): The tree edit distance algorithm to use (default: 'apted').
-        --index, -ix (str): Similarity index formula: 'ratio' (default), 'metric' or 'legacy'.
+        --index, -ix (str): Similarity index formula: 'legacy' (default), 'ratio' or 'metric'.
             Thresholds are scale-dependent: legacy 0.70 == ratio 0.769.
 
     Arguments for 'tree'/'view' action:
@@ -142,7 +142,7 @@ def main():
         default=DEFAULT_INDEX_FORMULA,
         help="Similarity index formula (default: %(default)s). 'ratio' = "
         "max/(max+d); 'metric' = (n1+n2-d)/(n1+n2+d); 'legacy' = 1-d/max, the "
-        "index of csim <= 3.4.2. 'ratio' ranks pairs exactly as 'legacy' does "
+        "index of csim <= 3.4.2 and the default. 'ratio' ranks pairs exactly as 'legacy' does "
         "but on a different scale, so thresholds do not carry over: "
         "legacy 0.70 = ratio 0.769, legacy 0.80 = ratio 0.833.",
     )

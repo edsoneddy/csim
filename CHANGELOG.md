@@ -3,9 +3,26 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+## [4.0.1]
+
+### `legacy` is the default index again
+
+4.0.0 made `ratio` (`max / (max + d)`) the default similarity index. That was
+reverted: `ratio` and `legacy` (`1 - d / max`) rank pairs identically, so the
+gains seen at a fixed 0.70 cut (dataset F macro F1 0.686 -> 0.824) come from
+moving the scale, not from separating related and unrelated pairs better, and
+the scale had been chosen while looking at the same datasets used to evaluate
+it. Keeping it as the default would bake that choice into every consumer.
+
+`--index` / `index_formula=` stay, so `ratio` and `metric` remain available for
+sensitivity analyses. With `legacy` as the default, scores and thresholds are
+exactly those of csim 3.4.2: consumers pinned to 4.0.0 should move to 4.0.1
+and, if they translated thresholds to the `ratio` scale, translate them back
+(`t_legacy = 2 - 1 / t_ratio`). 4.0.0 is the only release whose default differs.
+
 ## [4.0.0]
 
-### Selectable similarity index, with a new default (**breaking**)
+### Selectable similarity index, with a new default (**breaking**; default reverted in 4.0.1)
 
 `SimilarityIndex` was `1 - d / max(n1, n2)`, with a fallback to
 `1 - d / (n1 + n2)` whenever `d` passed the bound `max(n1, n2)` does not

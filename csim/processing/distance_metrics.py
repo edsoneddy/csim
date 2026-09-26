@@ -114,11 +114,12 @@ def TreeEditDistance(N1, N2, ted_algorithm="apted"):
     return d
 
 
-#: Formulas available to SimilarityIndex, see its docstring. "ratio" is the
-#: default since 4.0.0; "legacy" reproduces csim <= 3.4.2.
+#: Formulas available to SimilarityIndex, see its docstring. "legacy" is the
+#: default (the index of every csim release except 4.0.0); "ratio" and "metric"
+#: are opt-in.
 INDEX_FORMULAS = ("ratio", "metric", "legacy")
 
-DEFAULT_INDEX_FORMULA = "ratio"
+DEFAULT_INDEX_FORMULA = "legacy"
 
 
 def SimilarityIndex(d, T1, T2, index_formula=DEFAULT_INDEX_FORMULA):
@@ -129,7 +130,7 @@ def SimilarityIndex(d, T1, T2, index_formula=DEFAULT_INDEX_FORMULA):
 
     With `m = max(T1, T2)` and `s = T1 + T2`, the available formulas are:
 
-    * ``ratio`` (default): ``m / (m + d)``. Ranks pairs exactly as ``legacy``
+    * ``ratio``: ``m / (m + d)``. Ranks pairs exactly as ``legacy``
       does -- it is a monotone rescaling of it, so the ROC/AUC of the two is
       identical -- but stays in (0, 1] by construction and needs no fallback
       branch. A fixed cut translates as ``t_ratio = 1 / (2 - t_legacy)``:
@@ -139,8 +140,8 @@ def SimilarityIndex(d, T1, T2, index_formula=DEFAULT_INDEX_FORMULA):
       inequality when all insert/delete costs share one weight. Ranks
       differently from ``ratio``: it normalizes by the total size of both
       trees, not by the larger one.
-    * ``legacy``: ``1 - d / m``, the index of csim <= 3.4.2, kept to reproduce
-      earlier results. ``m`` does not actually bound ``d``, so this formula
+    * ``legacy`` (default): ``1 - d / m``, the index of csim <= 3.4.2 (and
+      of 4.0.1 onwards). ``m`` does not actually bound ``d``, so this formula
       switches denominator to ``s`` above the bound, which makes its scale
       discontinuous; on 6642 real pairs that branch fires once.
 
@@ -148,7 +149,7 @@ def SimilarityIndex(d, T1, T2, index_formula=DEFAULT_INDEX_FORMULA):
         d: Tree edit distance between the two trees.
         T1: Number of nodes in the first tree.
         T2: Number of nodes in the second tree.
-        index_formula: One of INDEX_FORMULAS (default: "ratio").
+        index_formula: One of INDEX_FORMULAS (default: "legacy").
 
     Returns:
         float: Similarity index in the range [0, 1], to 2 decimal places.

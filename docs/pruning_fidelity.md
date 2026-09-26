@@ -191,9 +191,10 @@ So the choice splits into two independent decisions: the *denominator*, which
 changes the ranking (a wash -- `s` wins 0.024 of AUC on A, loses 0.011 on F),
 and the *shape of the scale*, which does not change it at all.
 
-`ratio` was made the default: it keeps the ranking csim already had, drops
-`legacy`'s discontinuous fallback branch, and puts a fixed 0.70 at a usable
-operating point. `1 - d/s` was not exposed -- it shares `metric`'s ranking and
+`ratio` was first made the default (4.0.0) and reverted in 4.0.1: it keeps the
+ranking csim already had and puts a fixed 0.70 at a friendlier operating point,
+but that is a change of scale chosen while looking at the evaluation data, not
+better discrimination. It stays available as `--index ratio`. `1 - d/s` was not exposed -- it shares `metric`'s ranking and
 is the only candidate with cross-problem false positives.
 
 **Two caveats, since both matter for how these numbers are read.** The MAE

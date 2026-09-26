@@ -1,4 +1,4 @@
-from zss import simple_distance
+from zss import distance as zss_distance
 
 
 def label_distance(label1, label2):
@@ -36,6 +36,35 @@ def label_distance(label1, label2):
     return 1.0
 
 
+def node_weight(node):
+    """Cost of inserting or deleting a node: 1, or the mass a hashed node kept."""
+    return node.get("weight", 1)
+
+
+def rename_cost(node1, node2):
+    """Substitution cost between two tree nodes (dicts with a 'label').
+
+    Same as label_distance, except two weighted hashed nodes of the same rule
+    but different content are charged by how much of their content differs
+    (multiset overlap of the labels they replaced) instead of a flat 0.5.
+    """
+    sig1, sig2 = node1.get("sig"), node2.get("sig")
+    if sig1 is None or sig2 is None:
+        return label_distance(node1["label"], node2["label"])
+    if node1["label"] == node2["label"]:
+        return 0.0
+    rule1, hash1 = str(node1["label"]).split("|", 1)
+    rule2, hash2 = str(node2["label"]).split("|", 1)
+    heavy = max(node1["weight"], node2["weight"])
+    if rule1 != rule2:
+        return heavy if hash1 != hash2 else 0.5 * heavy
+    common = sum((sig1 & sig2).values())
+    total = sum(sig1.values()) + sum(sig2.values())
+    # Different digest means different content even if the multisets match
+    # (same labels, other order), so it never costs less than the old flat 0.5.
+    return max(heavy * (1.0 - 2.0 * common / total), 0.5)
+
+
 def TreeEditDistance(N1, N2, ted_algorithm="apted"):
     """Calculate the tree edit distance between two trees using the specified algorithm.
     Args:
@@ -46,27 +75,14 @@ def TreeEditDistance(N1, N2, ted_algorithm="apted"):
         int: The computed tree edit distance between the two trees.
     """
     if ted_algorithm == "zss":
-        # Custom configuration for zss to work with dictionaries
-        class CustomConfigZss:
-            @staticmethod
-            def get_children(node):
-                return node["children"]
-
-            @staticmethod
-            def get_label(node):
-                return node["label"]
-
-            @staticmethod
-            def label_dist(label1, label2):
-                """Compares two labels"""
-                return label_distance(label1, label2)
-
-        d = simple_distance(
+        # zss takes per-node cost functions, so weighted hashed nodes work too
+        d = zss_distance(
             N1,
             N2,
-            get_children=CustomConfigZss.get_children,
-            get_label=CustomConfigZss.get_label,
-            label_dist=CustomConfigZss.label_dist,
+            get_children=lambda node: node["children"],
+            insert_cost=node_weight,
+            remove_cost=node_weight,
+            update_cost=rename_cost,
         )
     elif ted_algorithm == "apted":
         from apted import APTED, Config
@@ -75,7 +91,13 @@ def TreeEditDistance(N1, N2, ted_algorithm="apted"):
         class CustomConfigApted(Config):
             def rename(self, node1, node2):
                 """Compares attribute .value of trees"""
-                return label_distance(node1["label"], node2["label"])
+                return rename_cost(node1, node2)
+
+            def delete(self, node):
+                return node_weight(node)
+
+            def insert(self, node):
+                return node_weight(node)
 
             def children(self, node):
                 """Get childrens of a node"""

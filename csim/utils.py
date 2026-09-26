@@ -378,6 +378,19 @@ def get_relabel_fn(lang):
     return None
 
 
+def get_hash_mass_alpha(lang):
+    """Exponent applied to the size of a hashed subtree to get its weight in
+    the edit distance, or None when the language keeps every node at weight 1."""
+    import importlib
+
+    if lang not in (
+        "python_3_13", "python_3", "java_20", "java_24", "cpp_14", "kotlin", "c",
+    ):
+        return None
+    module = importlib.import_module(f".{lang}.utils", package=__package__)
+    return getattr(module, "HASH_MASS_ALPHA", None)
+
+
 def get_structural_rule_indices(lang):
     """Retrieve the rules that mark a subtree as structural (control flow,
     bodies, declarations of callables/types) for a language.
@@ -506,6 +519,21 @@ def preprocess_code(file_name, file_content, lang="python_3_13"):
     return pruned_tree, pruned_count
 
 
+def count_tree_nodes(tree):
+    """Number of nodes of a normalized/pruned tree (iterative, deep-safe).
+
+    PruneAndHash's second value is the tree's *mass* when a language weights
+    its hashed nodes, so the plain node count has to be taken from the tree.
+    """
+    count = 0
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        count += 1
+        stack.extend(node["children"])
+    return count
+
+
 def count_nodes(file_name, file_content, lang="python_3_13"):
     """Count the nodes of a program before and after pruning.
 
@@ -534,8 +562,8 @@ def count_nodes(file_name, file_content, lang="python_3_13"):
         before += 1
         stack.extend(node.getChild(i) for i in range(node.getChildCount()))
 
-    _, after = PruneAndHash(Normalize(tree, lang), lang)
-    return before, after
+    pruned, _ = PruneAndHash(Normalize(tree, lang), lang)
+    return before, count_tree_nodes(pruned)
 
 
 def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):

@@ -125,3 +125,41 @@ for C, statement keywords (neutral).
 * **java_20 / C++**: doubly-indexed targets (`a[i][j] op= ...`) do not yet
   match their expansion exactly.
 * **C**: no assignment-operator rule exists; the operator is a bare terminal.
+
+## Faidhi ladder (dataset F) and weighted hashes (3.4.2, `python_3`)
+
+`scsc/notebooks/datasets/F` has 9 small problems, each a ladder r0..r4 where
+every step adds one Faidhi change (rename, reorder, swap a control structure,
+swap a technique): 90 related pairs with a known level plus 60 unrelated
+pairs. It covers L4-L6, which random pairs from `all_py` almost never reach.
+
+**Where the L5/L6 recall gap comes from.** With the 3.4.1 config, recall at
+0.70 is 14/18 (L4), 16/27 (L5), 9/36 (L6). The near-raw tree (no hashing, no
+rule exclusion) gets 14/16/11: pruning explains ~2 pairs, not the gap. The
+rest is the scale of the index: these pairs really do share only 55-70% of
+their tree, and a fixed 0.70 cuts through them. Ranking quality is fine:
+
+| Method (F, python_3) | L5 AUC | L6 AUC | L5 / L6 recall at 0.70 |
+|---|---|---|---|
+| csim 3.4.1 | 0.978 | 0.916 | 16/27, 9/36 |
+| csim near-raw tree | 1.00 | 0.99 | 16/27, 11/36 |
+| csim 3.4.2 | 0.975 | 0.950 | 15/27, 9/36 |
+| `pycode_similar` TreeDiff (scsc adapter) | 0.97 | 0.77 | 18/27, 13/36 |
+
+(AUC = related vs. the 60 unrelated pairs. The TED row scores unrelated pairs
+at 0.53 on average, csim at 0.23, so 0.70 is a much more lenient cut for it.
+Its metric is also directional and per-function, not `1 - d / max(n1, n2)`.)
+
+**What changed.** The remaining pruning loss was that a hashed node counted 1
+however large it was, and different-but-similar hashes were all-or-nothing.
+Hashed nodes now carry weight and a label multiset (see CHANGELOG 3.4.2).
+Sweep of the weight exponent alpha (MAE, seeds 7/11): none 0.087/0.098; 0.25
+0.073/0.083; 0.4 0.063/0.073; **0.6 0.052/0.061**; 0.75 0.060/0.063; 1.0
+0.104/0.094 (bias turns positive). Weights alone (flat 0.5 substitution) gave
+no gain (0.087-0.100), so the overlap-based substitution is what matters. Seed
+23 (not used to choose): 0.098 -> 0.054. Time on the 2 x 1440 pairs is
+unchanged (~6-7 s).
+
+**What did not change.** Raising recall at 0.70 on L5/L6 would need a
+calibrated (higher) index, not less pruning; that was not done, since it would
+also raise the score of unrelated pairs.

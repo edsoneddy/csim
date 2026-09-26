@@ -3,6 +3,33 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+## [3.4.2]
+
+### Weighted hashes for `python_3` (partial credit inside hashed subtrees)
+
+A hashed node used to cost 1 whatever it replaced, and two hashed nodes of the
+same rule with different content cost a flat 0.5. Now, for `python_3` only, a
+hashed node keeps the *mass* of the subtree it replaced (`(size + 1) ** 0.6`,
+`HASH_MASS_ALPHA` in `python_3/utils.py`) and the multiset of labels it
+covered. Insert/delete cost the weight, and a substitution between two hashed
+nodes of the same rule costs `weight * (1 - overlap)` (never below 0.5), so a
+statement that changed by one call is charged a fraction of a statement that
+was replaced entirely. Tree size, and so edit-distance time, is unchanged.
+
+* Fidelity (mean |error| of the index vs. the near-raw tree, 3 sets of 12
+  `all_py` problems, seeds 7/11 used to choose, 23 held out): 0.087 / 0.098 /
+  0.098 -> 0.052 / 0.061 / 0.054, bias ~0.
+* No new false similarity: 0/250 cross-problem pairs >= 0.7 per set (as before).
+* Dataset F (Faidhi ladder, 90 related + 60 unrelated pairs): AUC at L6 goes
+  0.916 -> 0.950; recall at threshold 0.70 is essentially unchanged
+  (L4 14/18, L5 16 -> 15/27, L6 9/36). See `docs/pruning_fidelity.md`.
+* `jv-umsa-dataset/controlled`: 35 -> 34 of 36 pairs >= 0.7 (one pair moved
+  0.70 -> 0.67).
+* `PruneAndHash` now returns the tree *mass* as its second value for weighted
+  languages (what `SimilarityIndex` needs); `count_nodes` and `csim tree` still
+  report real node counts. `--talg zss` supports the weights too.
+* Other languages, `python_3_13` included, are unchanged.
+
 ## [3.4.1]
 
 ### New: `csim.count_nodes`

@@ -1,4 +1,5 @@
 import hashlib
+from collections import Counter
 from antlr4 import TerminalNode
 from ..Visitors import (
     Python_3_13_ParserVisitorExtended,
@@ -16,6 +17,7 @@ from ..utils import (
     get_excluded_token_types,
     get_hash_rule_indices,
     get_excluded_rule_types,
+    get_hash_mass_alpha,
     get_relabel_fn,
     get_structural_rule_indices,
 )
@@ -121,6 +123,9 @@ def PruneAndHash(tree, lang):
     control_equivalence_rule_indices = get_control_equivalence_rule_indices(lang)
     exclude_childrens_from_rule = get_exclude_childrens_from_rule(lang)
     structural_rule_indices = get_structural_rule_indices(lang)
+    # When set, a hashed node keeps the mass of the subtree it replaced (see
+    # docs/pruning_fidelity.md, "Weighted hashes"); None keeps 1 node = 1.
+    mass_alpha = get_hash_mass_alpha(lang)
 
     def traverse_subtree(node):
         # Collect all labels in the subtree rooted at `node` into a single list
@@ -155,7 +160,8 @@ def PruneAndHash(tree, lang):
         for c in childrens:
             flat.extend(traverse_subtree(c))
         s = "|".join(map(str, flat))
-        return str(label) + "|" + hashlib.sha256(s.encode("utf-8")).hexdigest()
+        digest = str(label) + "|" + hashlib.sha256(s.encode("utf-8")).hexdigest()
+        return digest, flat
 
     # Ids of nodes whose subtree contains a structural (control-flow/body)
     # label. A hashed rule that contains one is NOT collapsed: its content is
@@ -184,8 +190,19 @@ def PruneAndHash(tree, lang):
 
         # For nodes that are in the hashed rule set, we hash their entire subtree to a single digest
         if node["label"] in hashed_rule_indices and id(node) not in has_structure:
-            digest = hash_children(label, node["children"])
-            return {"label": digest, "children": []}, 1
+            digest, flat = hash_children(label, node["children"])
+            if mass_alpha is None:
+                return {"label": digest, "children": []}, 1
+            # Weight and label multiset let the edit distance charge a hashed
+            # node in proportion to what it replaced and give partial credit
+            # to two hashed nodes of the same kind that share most content.
+            weight = (len(flat) + 1) ** mass_alpha
+            return {
+                "label": digest,
+                "children": [],
+                "weight": weight,
+                "sig": Counter(flat),
+            }, weight
 
         new_node = {"label": label, "children": []}
         count = 1

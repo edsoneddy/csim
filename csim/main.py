@@ -3,6 +3,7 @@ import os
 from .language.parser import ANTLR_parse
 from .processing.tree_processing import Normalize, PruneAndHash
 from .utils import (
+    count_tree_nodes,
     group_by_exhaustive_search,
     print_antlr_tree,
     print_tree,
@@ -179,7 +180,8 @@ def main():
             print()
 
         normalized_tree = Normalize(raw_tree, args.lang)
-        pruned_tree, node_count = PruneAndHash(normalized_tree, args.lang)
+        pruned_tree, _ = PruneAndHash(normalized_tree, args.lang)
+        node_count = count_tree_nodes(pruned_tree)
 
         print("=== Normalized + Pruned Tree (input to Tree Edit Distance) ===")
         print_tree(pruned_tree, lang=args.lang)

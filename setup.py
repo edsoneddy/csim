@@ -49,7 +49,7 @@ except ImportError:
 
 setup(
     name="csim",
-    version="3.4.1",
+    version="3.4.2",
     packages=find_packages(),
     package_data={
         # Compiled native parsers, when built (scripts/build_native_parsers.sh).

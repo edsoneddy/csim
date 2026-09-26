@@ -252,6 +252,10 @@ HASHED_RULE_INDICES = {
     # without hashing anything.
 }
 
+# Exponent for the weight of a hashed node (its subtree size ** alpha) in the
+# tree edit distance; see docs/pruning_fidelity.md, "Weighted hashes".
+HASH_MASS_ALPHA = 0.6
+
 # `for` and `while` are interchangeable ways to write the same loop (the
 # jv-umsa-dataset/controlled clones rewrite one as the other), so both get the
 # same label; mirrors python_3_13 and the 2.0.0 behaviour.

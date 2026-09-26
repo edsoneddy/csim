@@ -212,3 +212,14 @@ contract; no tree-edit-distance variant reaches them. Sibling canonical
 ordering inside blocks (the standard answer to Faidhi L4 reordering) was also
 prototyped and rejected: it moves F's AUC by +0.004 at best and costs A, B
 and C.
+
+**Inlining single-use temporaries was also prototyped and not adopted.** The
+Faidhi ladders often differ by `x = f(a)` followed by `print(x)` versus
+`print(f(a))`. A source-level prototype that inlines a variable stored once and
+read once in the next statement, scored with the same pipeline, moved dataset F
+by one pair (recall at 0.70: 47 -> 48 of 90; AUC 0.9727 -> 0.9784) and was mixed
+on the regression datasets (AUC A +0.007, D +0.005, E +0.004, B -0.003, C
+-0.0005). The 16 related non-`r4` pairs of F still under 0.70 are recursion vs.
+loop (`gcd_r3`, `mergelists_r3`), tuple-swap vs. temporary (`gcd_r2`) and
+reordered/consolidated statements (`sieve_r2`); none is a renaming-level
+difference a tree normalization can remove, so the pipeline was left as is.

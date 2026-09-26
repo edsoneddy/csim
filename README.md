@@ -84,7 +84,7 @@ file2.py is similar to file3.py with similarity index: 0.50
 **Options:**
 - `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `python_3`, `java_20`, `java_24`, `cpp_14`, `kotlin`, `c`
 - `--talg, -ta`: Tree edit distance algorithm (default: `apted`). Options: `zss`, `apted`
-- `--index, -ix`: Similarity index formula (default: `ratio`). Options: `ratio`, `metric`, `legacy`
+- `--index, -ix`: Similarity index formula (default: `legacy`). Options: `legacy`, `ratio`, `metric`
 
 **Example with options:**
 ```sh
@@ -131,7 +131,7 @@ csim group --path /path/to/directory --threshold 0.8 --strategy exhaustive
 - `--strategy, -s`: Grouping strategy (default: `exhaustive`). Options: `exhaustive`
 - `--lang, -l`: Programming language (default: `python_3_13`). Options: `python_3_13`, `python_3`, `java_20`, `java_24`, `cpp_14`, `kotlin`, `c`
 - `--talg, -ta`: Tree edit distance algorithm (default: `apted`). Options: `zss`, `apted`
-- `--index, -ix`: Similarity index formula (default: `ratio`). Options: `ratio`, `metric`, `legacy`
+- `--index, -ix`: Similarity index formula (default: `legacy`). Options: `legacy`, `ratio`, `metric`
 
 **Complete example:**
 ```sh
@@ -145,9 +145,9 @@ similarity index. With `m = max(n1, n2)` and `s = n1 + n2`:
 
 | Value | Formula | Notes |
 |---|---|---|
-| `ratio` (default) | `m / (m + d)` | Always in (0, 1]. Ranks pairs exactly as `legacy` does. |
+| `legacy` (default) | `1 - d / m` | The index of csim <= 3.4.2. |
+| `ratio` | `m / (m + d)` | Always in (0, 1]. Ranks pairs exactly as `legacy` does, on a different scale. |
 | `metric` | `(s - d) / (s + d)` | Metric normalization of tree edit distance (Li & Zhang); satisfies the triangle inequality. Ranks by total size instead of by the larger tree. |
-| `legacy` | `1 - d / m` | The index of csim <= 3.4.2. Kept to reproduce earlier results. |
 
 **Thresholds do not carry over between formulas.** `ratio` is a monotone
 rescaling of `legacy`, so it groups files in exactly the same order, but on a
@@ -162,7 +162,8 @@ different scale. To reproduce a `legacy` threshold under `ratio`, use
 
 Because `ratio` never reaches 0 in practice (a pair with nothing in common
 sits near 0.5, where `legacy` puts it near 0), a threshold taken straight from
-the old scale will be far more lenient than intended.
+the `legacy` scale will be far more lenient than intended. `legacy` is the
+default so that existing thresholds keep their meaning.
 
 ### Action 3: `tree` (alias: `view`) - Visualize Parse Trees
 

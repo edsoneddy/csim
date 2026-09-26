@@ -121,7 +121,7 @@ def test_cli_group_transitive_cluster(tmp_path: Path):
 def test_cli_index_formula():
     """
     Testing that --index selects the similarity index formula, and that the
-    'ratio' default puts the same pair on a higher scale than 'legacy'.
+    default is 'legacy' and that 'ratio' puts the same pair on a higher scale.
     """
     test_dir = "test/files/"
 
@@ -142,7 +142,7 @@ def test_cli_index_formula():
     ratio = scores("-ix", "ratio")
     legacy = scores("--index", "legacy")
 
-    assert default and default == ratio, "'ratio' should be the default formula"
+    assert default and default == legacy, "'legacy' should be the default formula"
     assert all(r >= l for r, l in zip(ratio, legacy)), "ratio rescales legacy upwards"
     assert ratio != legacy, "the two formulas should not produce identical output"
 

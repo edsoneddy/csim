@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 import os
 from .DataStructures import UFDS as UnionFind
+from .processing.distance_metrics import DEFAULT_INDEX_FORMULA, INDEX_FORMULAS
 
 
 def get_file(file_path):
@@ -10,12 +11,173 @@ def get_file(file_path):
     return file_path
 
 
-def print_tree(node, indent=0):
+def get_rule_names(lang):
+    """Retrieve the parser rule names for a language, indexed by rule index.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        list: Rule names indexed by rule index, or None if unavailable.
+    """
+    if lang == "python_3_13":
+        from .python_3_13.PythonParser import PythonParser
+        return PythonParser.ruleNames
+    elif lang == "java_20":
+        from .java_20.Java20Parser import Java20Parser
+        return Java20Parser.ruleNames
+    elif lang == "java_24":
+        from .java_24.Java24Parser import Java24Parser
+        return Java24Parser.ruleNames
+    elif lang == "cpp_14":
+        from .cpp_14.CPP14Parser import CPP14Parser
+        return CPP14Parser.ruleNames
+    elif lang == "python_3":
+        from .python_3.Python3Parser import Python3Parser
+        return Python3Parser.ruleNames
+    elif lang == "kotlin":
+        from .kotlin.KotlinParser import KotlinParser
+        return KotlinParser.ruleNames
+    elif lang == "c":
+        from .c.CParser import CParser
+        return CParser.ruleNames
+    else:
+        return None
+
+
+def get_symbolic_names(lang):
+    """Retrieve the lexer symbolic token names for a language, indexed by token type.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        list: Symbolic token names indexed by token type, or None if unavailable.
+    """
+    if lang == "python_3_13":
+        from .python_3_13.PythonLexer import PythonLexer
+        return PythonLexer.symbolicNames
+    elif lang == "java_20":
+        from .java_20.Java20Lexer import Java20Lexer
+        return Java20Lexer.symbolicNames
+    elif lang == "java_24":
+        from .java_24.Java24Lexer import Java24Lexer
+        return Java24Lexer.symbolicNames
+    elif lang == "cpp_14":
+        from .cpp_14.CPP14Lexer import CPP14Lexer
+        return CPP14Lexer.symbolicNames
+    elif lang == "python_3":
+        from .python_3.Python3Lexer import Python3Lexer
+        return Python3Lexer.symbolicNames
+    elif lang == "kotlin":
+        from .kotlin.KotlinLexer import KotlinLexer
+        return KotlinLexer.symbolicNames
+    elif lang == "c":
+        from .c.CLexer import CLexer
+        return CLexer.symbolicNames
+    else:
+        return None
+
+
+def get_synthetic_names(lang):
+    """Names of the synthetic rule ids a language's relabel_node() can emit
+    (e.g. python_3's 202 -> "if_stmt"), so printed trees read as words."""
+    import importlib
+
+    if lang not in ("python_3", "java_24"):
+        return {}
+    module = importlib.import_module(f".{lang}.utils", package=__package__)
+    return getattr(module, "SYNTHETIC_NAMES", {})
+
+
+def format_label(label, rule_names=None, symbolic_names=None, synthetic_names=None):
+    """Resolve a normalized-tree label to a human-readable string.
+
+    A label is either a rule index (int), a token type offset by
+    TOKEN_TYPE_OFFSET (int), a control-equivalence tag such as "LOOP" (str),
+    or a hashed subtree digest in the form "<label>|<hexdigest>" (str).
+
+    Args:
+        label: The node label to resolve.
+        rule_names: Parser rule names indexed by rule index, or None.
+        symbolic_names: Lexer symbolic token names indexed by token type, or None.
+
+    Returns:
+        str: Human-readable representation of the label.
+    """
+    if isinstance(label, str):
+        if "|" in label:
+            prefix, digest = label.split("|", 1)
+            if synthetic_names and prefix.isdigit() and int(prefix) in synthetic_names:
+                prefix = synthetic_names[int(prefix)]
+            elif rule_names and prefix.isdigit() and int(prefix) < len(rule_names):
+                prefix = rule_names[int(prefix)]
+            return f"{prefix} [hashed:{digest[:8]}]"
+        return label
+    if isinstance(label, int):
+        if label >= TOKEN_TYPE_OFFSET:
+            token_type = label - TOKEN_TYPE_OFFSET
+            if symbolic_names and 0 <= token_type < len(symbolic_names):
+                return symbolic_names[token_type]
+            return f"TOKEN<{token_type}>"
+        if synthetic_names and label in synthetic_names:
+            return synthetic_names[label]
+        if rule_names and 0 <= label < len(rule_names):
+            return rule_names[label]
+    return str(label)
+
+
+def print_tree(node, indent=0, lang=None):
+    """Print a normalized/pruned tree with visual indentation.
+
+    Args:
+        node: A dict-based tree with "label" and "children" keys.
+        indent (int): Current indentation depth.
+        lang (str): If given, resolve labels to rule/token names for readability.
+    """
     if node is None:
         return
-    print("   " * indent + str(node.label))
-    for child in node.children:
-        print_tree(child, indent + 1)
+
+    rule_names = get_rule_names(lang) if lang else None
+    symbolic_names = get_symbolic_names(lang) if lang else None
+    synthetic_names = get_synthetic_names(lang) if lang else None
+
+    def _print(n, depth):
+        print("   " * depth + format_label(n["label"], rule_names, symbolic_names, synthetic_names))
+        for child in n["children"]:
+            _print(child, depth + 1)
+
+    _print(node, indent)
+
+
+def print_antlr_tree(node, lang, indent=0):
+    """Print a raw ANTLR parse tree with visual indentation, resolving rule names
+    and printing terminal token text as leaves.
+
+    Args:
+        node: ANTLR parse tree node (rule context or terminal node).
+        lang (str): Programming language identifier, used to resolve rule names.
+        indent (int): Current indentation depth.
+    """
+    from antlr4 import TerminalNode
+
+    rule_names = get_rule_names(lang)
+
+    def _print(n, depth):
+        if isinstance(n, TerminalNode):
+            print("   " * depth + repr(n.getText()))
+            return
+        rule_index = n.getRuleIndex()
+        label = (
+            rule_names[rule_index]
+            if rule_names and 0 <= rule_index < len(rule_names)
+            else str(rule_index)
+        )
+        print("   " * depth + label)
+        for child in n.getChildren():
+            _print(child, depth + 1)
+
+    _print(node, indent)
 
 
 def get_file(file_path):
@@ -34,32 +196,39 @@ def read_file(file_path):
         return file_path, None
 
 
-def process_files(path, files):
-    # Storage for file names and contents
+def get_extension_by_lang(lang):
+    if lang == "python_3_13":
+        return ".py"
+    elif lang == "java_20":
+        return ".java"
+    elif lang == "java_24":
+        return ".java"
+    elif lang == "cpp_14":
+        return ".cpp"
+    elif lang == "python_3":
+        return ".py"
+    elif lang == "kotlin":
+        return ".kt"
+    elif lang == "c":
+        return ".c"
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
+
+
+def process_files(path, lang):
     file_names = []
     file_contents = []
 
-    # Process the files based on the provided arguments
     if path:
-        # Check if the path is a valid directory
         if not os.path.isdir(path):
-            print(f"Error: The path '{path}' is not a valid directory.")
-            return file_names, file_contents
-        # Process the files in the directory
+            raise NotADirectoryError(f"The path '{path}' is not a valid directory.")
+
         for file in os.listdir(path):
             file_path = os.path.join(path, file)
-            if os.path.isfile(file_path) and file.endswith(".py"):
+            if os.path.isfile(file_path) and file.endswith(get_extension_by_lang(lang)):
                 file_name, content = read_file(file_path)
-                # Store the file name and content
                 file_names.append(file_name)
                 file_contents.append(content)
-    elif files:
-        file1, file2 = files
-        file_name1, content1 = read_file(file1)
-        file_name2, content2 = read_file(file2)
-        # Store the file name and content
-        file_names.extend([file_name1, file_name2])
-        file_contents.extend([content1, content2])
 
     return file_names, file_contents
 
@@ -77,13 +246,76 @@ def get_excluded_token_types(lang):
     Returns:
         set: Set of excluded token types.
     """
-    if lang == "python":
-        from .python.utils import EXCLUDED_TOKEN_TYPES as python_excluded_tokens
+    if lang == "python_3_13":
+        from .python_3_13.utils import EXCLUDED_TOKEN_TYPES as python_3_13_excluded
 
-        return python_excluded_tokens
+        return python_3_13_excluded
+    elif lang == "java_20":
+        from .java_20.utils import EXCLUDED_TOKEN_TYPES as java_20_excluded
+
+        return java_20_excluded
+    elif lang == "java_24":
+        from .java_24.utils import EXCLUDED_TOKEN_TYPES as java_24_excluded
+
+        return java_24_excluded
+    elif lang == "cpp_14":
+        from .cpp_14.utils import EXCLUDED_TOKEN_TYPES as cpp_14_excluded
+
+        return cpp_14_excluded
+    elif lang == "python_3":
+        from .python_3.utils import EXCLUDED_TOKEN_TYPES as python_3_excluded
+
+        return python_3_excluded
+    elif lang == "kotlin":
+        from .kotlin.utils import EXCLUDED_TOKEN_TYPES as kotlin_excluded
+
+        return kotlin_excluded
+    elif lang == "c":
+        from .c.utils import EXCLUDED_TOKEN_TYPES as c_excluded
+
+        return c_excluded
     else:
         return set()  # Default to empty set for unsupported languages
 
+def get_excluded_rule_types(lang):
+    """Retrieve excluded rule types based on the programming language.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        set: Set of excluded rule types.
+    """
+    if lang == "python_3_13":
+        from .python_3_13.utils import EXCLUDED_RULE_TYPES as python_3_13_excluded
+
+        return python_3_13_excluded
+    elif lang == "java_20":
+        from .java_20.utils import EXCLUDED_RULE_TYPES as java_20_excluded
+
+        return java_20_excluded
+    elif lang == "java_24":
+        from .java_24.utils import EXCLUDED_RULE_TYPES as java_24_excluded
+
+        return java_24_excluded
+    elif lang == "cpp_14":
+        from .cpp_14.utils import EXCLUDED_RULE_TYPES as cpp_14_excluded
+
+        return cpp_14_excluded
+    elif lang == "python_3":
+        from .python_3.utils import EXCLUDED_RULE_TYPES as python_3_excluded
+
+        return python_3_excluded
+    elif lang == "kotlin":
+        from .kotlin.utils import EXCLUDED_RULE_TYPES as kotlin_excluded
+
+        return kotlin_excluded
+    elif lang == "c":
+        from .c.utils import EXCLUDED_RULE_TYPES as c_excluded
+
+        return c_excluded
+    else:
+        return set()  # Default to empty set for unsupported languages
 
 def get_hash_rule_indices(lang):
     """Retrieve hashed rule indices based on the programming language.
@@ -92,12 +324,93 @@ def get_hash_rule_indices(lang):
     Returns:
         set: Set of hashed rule indices.
     """
-    if lang == "python":
-        from .python.utils import HASHED_RULE_INDICES as python_hashed_rules
-
-        return python_hashed_rules
+    if lang == "python_3_13":
+        from .python_3_13.utils import HASHED_RULE_INDICES as python_3_13_hashed_rules
+        return python_3_13_hashed_rules
+    if lang == "java_20":
+        from .java_20.utils import HASHED_RULE_INDICES as java_20_hashed_rules
+        return java_20_hashed_rules
+    if lang == "java_24":
+        from .java_24.utils import HASHED_RULE_INDICES as java_24_hashed_rules
+        return java_24_hashed_rules
+    if lang == "cpp_14":
+        from .cpp_14.utils import HASHED_RULE_INDICES as cpp_14_hashed_rules
+        return cpp_14_hashed_rules
+    if lang == "python_3":
+        from .python_3.utils import HASHED_RULE_INDICES as python_3_hashed_rules
+        return python_3_hashed_rules
+    if lang == "kotlin":
+        from .kotlin.utils import HASHED_RULE_INDICES as kotlin_hashed_rules
+        return kotlin_hashed_rules
+    if lang == "c":
+        from .c.utils import HASHED_RULE_INDICES as c_hashed_rules
+        return c_hashed_rules
     else:
         return set()  # Default to empty set for unsupported languages
+
+
+def get_relabel_fn(lang):
+    """Retrieve a language-specific node relabeling hook, if any.
+
+    Some grammars fold constructs that another language's grammar keeps as
+    separate rules into one unified rule with ANTLR labeled alternatives
+    (e.g. java_24's `expression` covers binary operators, assignments, casts,
+    etc. under a single rule index) -- EXCLUDED_RULE_TYPES/HASHED_RULE_INDICES
+    can't target just one of those alternatives by rule index alone. This
+    hook lets a language's utils.py inspect a node's actual children (e.g.
+    the specific operator token) and return a synthetic rule id to use
+    instead of the real one, before the rest of Normalize's classification
+    runs -- see csim/java_24/utils.py's relabel_node() for the concrete case
+    this exists for.
+
+    Args:
+        lang (str): Programming language identifier.
+
+    Returns:
+        callable(node) -> Optional[int], or None if this language needs no
+            relabeling (the default for most languages).
+    """
+    if lang == "java_24":
+        from .java_24.utils import relabel_node
+        return relabel_node
+    if lang == "python_3":
+        from .python_3.utils import relabel_node
+        return relabel_node
+    return None
+
+
+def get_hash_mass_alpha(lang):
+    """Exponent applied to the size of a hashed subtree to get its weight in
+    the edit distance, or None when the language keeps every node at weight 1."""
+    import importlib
+
+    if lang not in (
+        "python_3_13", "python_3", "java_20", "java_24", "cpp_14", "kotlin", "c",
+    ):
+        return None
+    module = importlib.import_module(f".{lang}.utils", package=__package__)
+    return getattr(module, "HASH_MASS_ALPHA", None)
+
+
+def get_structural_rule_indices(lang):
+    """Retrieve the rules that mark a subtree as structural (control flow,
+    bodies, declarations of callables/types) for a language.
+
+    A rule in HASHED_RULE_INDICES is only collapsed to a digest when its
+    subtree contains none of these, so hashing can compress expressions and
+    simple statements without ever flattening the program's skeleton.
+
+    Returns:
+        set: Rule indices (or synthetic ids); empty when a language declares none.
+    """
+    import importlib
+
+    if lang not in (
+        "python_3_13", "python_3", "java_20", "java_24", "cpp_14", "kotlin", "c",
+    ):
+        return set()
+    module = importlib.import_module(f".{lang}.utils", package=__package__)
+    return getattr(module, "STRUCTURAL_RULE_INDICES", set())
 
 
 def get_exclude_childrens_from_rule(lang):
@@ -107,16 +420,45 @@ def get_exclude_childrens_from_rule(lang):
         lang (str): Programming language identifier.
 
     Returns:
-        set: Set of rule indices whose children should be excluded from similarity comparison.
+        dict: Dictionary mapping rule indices to lists of child indices to exclude.
     """
-    if lang == "python":
-        from .python.utils import (
-            EXCLUDE_CHILDRENS_FROM_RULE as python_exclude_childrens_from_rule,
+    if lang == "python_3_13":
+        from .python_3_13.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as python_3_13_exclude_childrens_from_rule,
         )
-
-        return python_exclude_childrens_from_rule
+        return python_3_13_exclude_childrens_from_rule
+    if lang == "java_20":
+        from .java_20.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as java_20_exclude_childrens_from_rule,
+        )
+        return java_20_exclude_childrens_from_rule
+    if lang == "java_24":
+        from .java_24.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as java_24_exclude_childrens_from_rule,
+        )
+        return java_24_exclude_childrens_from_rule
+    if lang == "cpp_14":
+        from .cpp_14.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as cpp_14_exclude_childrens_from_rule,
+        )
+        return cpp_14_exclude_childrens_from_rule
+    if lang == "python_3":
+        from .python_3.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as python_3_exclude_childrens_from_rule,
+        )
+        return python_3_exclude_childrens_from_rule
+    if lang == "kotlin":
+        from .kotlin.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as kotlin_exclude_childrens_from_rule,
+        )
+        return kotlin_exclude_childrens_from_rule
+    if lang == "c":
+        from .c.utils import (
+            EXCLUDE_CHILDRENS_FROM_RULE as c_exclude_childrens_from_rule,
+        )
+        return c_exclude_childrens_from_rule
     else:
-        return set()  # Default to empty set for unsupported languages
+        return dict()  # Default to empty dict for unsupported languages
 
 
 def get_control_equivalence_rule_indices(lang):
@@ -128,17 +470,46 @@ def get_control_equivalence_rule_indices(lang):
     Returns:
         dict: Dictionary mapping rule indices to their equivalence classes for control flow analysis.
     """
-    if lang == "python":
-        from .python.utils import (
-            CONTROL_EQUIVALENCE_RULE_INDICES as python_control_equivalence_rules,
+    if lang == "python_3_13":
+        from .python_3_13.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as python_3_13_control_equivalence_rules,
         )
-
-        return python_control_equivalence_rules
+        return python_3_13_control_equivalence_rules
+    if lang == "java_20":
+        from .java_20.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as java_20_control_equivalence_rules,
+        )
+        return java_20_control_equivalence_rules
+    if lang == "java_24":
+        from .java_24.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as java_24_control_equivalence_rules,
+        )
+        return java_24_control_equivalence_rules
+    if lang == "cpp_14":
+        from .cpp_14.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as cpp_14_control_equivalence_rules,
+        )
+        return cpp_14_control_equivalence_rules
+    if lang == "python_3":
+        from .python_3.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as python_3_control_equivalence_rules,
+        )
+        return python_3_control_equivalence_rules
+    if lang == "kotlin":
+        from .kotlin.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as kotlin_control_equivalence_rules,
+        )
+        return kotlin_control_equivalence_rules
+    if lang == "c":
+        from .c.utils import (
+            CONTROL_EQUIVALENCE_RULE_INDICES as c_control_equivalence_rules,
+        )
+        return c_control_equivalence_rules
     else:
         return dict()  # Default to empty dict for unsupported languages
 
 
-def preprocess_code(file_name, file_content, lang="python"):
+def preprocess_code(file_name, file_content, lang="python_3_13"):
     # Local import to avoid circular dependency at module import time
     from .CodeSimilarity import ANTLR_parse, Normalize, PruneAndHash
 
@@ -149,7 +520,56 @@ def preprocess_code(file_name, file_content, lang="python"):
     return pruned_tree, pruned_count
 
 
-def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):
+def count_tree_nodes(tree):
+    """Number of nodes of a normalized/pruned tree (iterative, deep-safe).
+
+    PruneAndHash's second value is the tree's *mass* when a language weights
+    its hashed nodes, so the plain node count has to be taken from the tree.
+    """
+    count = 0
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        count += 1
+        stack.extend(node["children"])
+    return count
+
+
+def count_nodes(file_name, file_content, lang="python_3_13"):
+    """Count the nodes of a program before and after pruning.
+
+    Args:
+        file_name (str): Name of the file (used only for syntax-error messages).
+        file_content (str): Source code.
+        lang (str): Programming language identifier.
+
+    Returns:
+        tuple[int, int]: (nodes_before, nodes_after). `nodes_before` is every
+        node of the raw ANTLR parse tree (rules and tokens); `nodes_after` is
+        the size of the normalized, pruned and hashed tree that is handed to
+        the tree edit distance -- the same number `csim tree` prints as
+        "Total nodes after pruning".
+    """
+    # Local import to avoid circular dependency at module import time
+    from .CodeSimilarity import ANTLR_parse, Normalize, PruneAndHash
+
+    tree = ANTLR_parse(file_name, file_content, lang)
+
+    # Iterative: real programs can nest deeper than the recursion limit.
+    before = 0
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        before += 1
+        stack.extend(node.getChild(i) for i in range(node.getChildCount()))
+
+    pruned, _ = PruneAndHash(Normalize(tree, lang), lang)
+    return before, count_tree_nodes(pruned)
+
+
+def get_similarity_coefficient(
+    proccesed_code1, proccesed_code2, ted_algorithm, index_formula=DEFAULT_INDEX_FORMULA
+):
     N1, len_N1 = proccesed_code1
     N2, len_N2 = proccesed_code2
 
@@ -157,11 +577,13 @@ def get_similarity_coefficient(proccesed_code1, proccesed_code2, ted_algorithm):
     from .CodeSimilarity import SimilarityIndex, TreeEditDistance
 
     d = TreeEditDistance(N1, N2, ted_algorithm)
-    result = SimilarityIndex(d, len_N1, len_N2)
+    result = SimilarityIndex(d, len_N1, len_N2, index_formula=index_formula)
     return result
 
 
-def compare_all(file_names, file_contents, lang, ted_algorithm):
+def report_pairwise_similarity(
+    file_names, file_contents, lang, ted_algorithm, index_formula=DEFAULT_INDEX_FORMULA
+):
 
     file_number = len(file_names)
     proccesed_files = [
@@ -176,8 +598,9 @@ def compare_all(file_names, file_contents, lang, ted_algorithm):
 
     # Fill the first row and first column with file names
     for i in range(file_number):
-        similarity_matrix[0][i + 1] = file_names[i].split("/")[-1].replace(".py", "")
-        similarity_matrix[i + 1][0] = file_names[i].split("/")[-1].replace(".py", "")
+        display_name = Path(file_names[i]).name
+        similarity_matrix[0][i + 1] = display_name
+        similarity_matrix[i + 1][0] = display_name
 
     results = []
     # Calculate similarity percentages and fill the matrix
@@ -190,7 +613,9 @@ def compare_all(file_names, file_contents, lang, ted_algorithm):
                 similarity_matrix[i + 1][j + 1] = 1.00
             else:
                 file_b = proccesed_files[j]
-                similarity_index = get_similarity_coefficient(file_a, file_b, ted_algorithm)
+                similarity_index = get_similarity_coefficient(
+                    file_a, file_b, ted_algorithm, index_formula
+                )
                 similarity_matrix[i + 1][j + 1] = round(similarity_index, 2)
                 similarity_matrix[j + 1][i + 1] = round(similarity_index, 2)
                 results.append(
@@ -200,9 +625,11 @@ def compare_all(file_names, file_contents, lang, ted_algorithm):
     return "\n".join(results)
 
 
-def get_output_by_group(file_names, groups, similarity_indices, threshold):
+def get_output_by_group(file_names, groups, similarity_indices, threshold, printable_output=True):
     result = []
-    unique_files = []
+    similarity_groups = []
+    similarity_groups_avg = []
+    unique_groups = []
 
     result.append(f"Threshold: {threshold}")
     result.append(f"Total files processed: {len(file_names)}")
@@ -218,18 +645,39 @@ def get_output_by_group(file_names, groups, similarity_indices, threshold):
             )
             result.extend([file_names[file] for file in file_group])
             groups_cnt += 1
+            similarity_groups_avg.append(avg_similarity)
+            similarity_groups.append([file_names[file] for file in file_group])
         else:
-            unique_files.append(file_names[file_group[0]])
+            unique_groups.append(file_names[file_group[0]])
 
-    if unique_files:
+    if len(similarity_groups) > 0 and len(similarity_groups_avg) > 0:
+        # Sort the similarity groups by average similarity in descending order
+        similarity_groups_avg, similarity_groups = zip(
+            *sorted(
+                zip(similarity_groups_avg, similarity_groups), key=lambda x: x[0], reverse=True
+            )
+        )
+
+    if unique_groups:
         result.append(f"Unique Files (similarity below threshold):")
-        for file in unique_files:
+        for file in unique_groups:
             result.append(file)
 
-    return "\n".join(result)
+    if printable_output:
+        return "\n".join(result)
+
+    return similarity_groups, similarity_groups_avg, unique_groups, "\n".join(result)
 
 
-def group_by_similarity(file_names, file_contents, lang, threshold, ted_algorithm):
+def group_by_exhaustive_search(
+    file_names,
+    file_contents,
+    lang,
+    threshold,
+    ted_algorithm,
+    printable_output=True,
+    index_formula=DEFAULT_INDEX_FORMULA,
+):
 
     file_number = len(file_names)
     grouper = UnionFind(file_number)
@@ -242,17 +690,15 @@ def group_by_similarity(file_names, file_contents, lang, threshold, ted_algorith
     similarity_indices = [0.00] * file_number
 
     for i in range(file_number - 1):
-        if grouper.find(i) == i:
-            file_a = proccesed_files[i]
-            for j in range(i + 1, file_number):
-                if grouper.find(j) == j:
-                    file_b = proccesed_files[j]
-                    similarity_index = get_similarity_coefficient(
-                        file_a, file_b, ted_algorithm
-                    )
-                    if similarity_index > threshold:
-                        grouper.union(i, j)
-                        similarity_indices[j] = similarity_index
+        file_a = proccesed_files[i]
+        for j in range(i + 1, file_number):
+            file_b = proccesed_files[j]
+            similarity_index = get_similarity_coefficient(
+                file_a, file_b, ted_algorithm, index_formula
+            )
+            if similarity_index > threshold:
+                grouper.union(i, j)
+                similarity_indices[j] = similarity_index
 
     groups = {}
 
@@ -264,4 +710,4 @@ def group_by_similarity(file_names, file_contents, lang, threshold, ted_algorith
 
     groups = list(groups.values())
 
-    return get_output_by_group(file_names, groups, similarity_indices, threshold)
+    return get_output_by_group(file_names, groups, similarity_indices, threshold, printable_output)

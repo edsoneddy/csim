@@ -1,0 +1,245 @@
+import hashlib
+from collections import Counter
+from antlr4 import TerminalNode
+from ..Visitors import (
+    Python_3_13_ParserVisitorExtended,
+    Java20ParserVisitorExtended,
+    Java24ParserVisitorExtended,
+    CPP14ParserVisitorExtended,
+    Python3ParserVisitorExtended,
+    KotlinParserVisitorExtended,
+    CParserVisitorExtended,
+)
+from ..utils import (
+    TOKEN_TYPE_OFFSET,
+    get_control_equivalence_rule_indices,
+    get_exclude_childrens_from_rule,
+    get_excluded_token_types,
+    get_hash_rule_indices,
+    get_excluded_rule_types,
+    get_hash_mass_alpha,
+    get_relabel_fn,
+    get_structural_rule_indices,
+)
+
+
+def get_parser_visitor_class(lang):
+    """Factory function to create a ParserVisitor class with the correct base visitor.
+    Args:
+        lang (str): Programming language identifier.
+    Returns:
+        class: A ParserVisitor class that extends the appropriate base visitor for the given language.
+    """
+    base_visitor = None
+    if lang == "python_3_13":
+        base_visitor = Python_3_13_ParserVisitorExtended
+    elif lang == "java_20":
+        base_visitor = Java20ParserVisitorExtended
+    elif lang == "java_24":
+        base_visitor = Java24ParserVisitorExtended
+    elif lang == "cpp_14":
+        base_visitor = CPP14ParserVisitorExtended
+    elif lang == "python_3":
+        base_visitor = Python3ParserVisitorExtended
+    elif lang == "kotlin":
+        base_visitor = KotlinParserVisitorExtended
+    elif lang == "c":
+        base_visitor = CParserVisitorExtended
+
+    if base_visitor is None:
+        raise ValueError(f"Unsupported language: {lang}")
+
+    relabel_fn = get_relabel_fn(lang)
+
+    class ParserVisitor(base_visitor):
+        """Custom visitor class that extends the base visitor for the specified language.
+        This class can be further customized to implement language-specific normalization logic.
+        """
+
+        def __init__(self, excluded_token_types, excluded_rule_types):
+            super().__init__()
+            self.excluded_token_types = excluded_token_types
+            self.excluded_rule_types = excluded_rule_types
+
+        def visitChildren(self, node):
+            """Visit and process all children of a parse tree node.
+
+            Args:
+                node: ANTLR parse tree node to process.
+
+            Returns:
+                A dictionary representing the normalized subtree.
+            """
+            rule_index = node.getRuleIndex()
+            if relabel_fn is not None:
+                rule_index = relabel_fn(node) or rule_index
+            children_nodes = []
+
+            for child in node.getChildren():
+                if isinstance(child, TerminalNode):
+                    token = child.symbol
+                    if token.type not in self.excluded_token_types:
+                        children_nodes.append(
+                            {
+                                "label": token.type + TOKEN_TYPE_OFFSET,
+                                "children": [],
+                            }
+                        )
+                else:
+                    child_rule_index = child.getRuleIndex()
+                    if relabel_fn is not None:
+                        child_rule_index = relabel_fn(child) or child_rule_index
+                    if child_rule_index not in self.excluded_rule_types:
+                        result = self.visit(child)
+                        if result is not None:
+                            children_nodes.append(result)
+
+            if not children_nodes:
+                return {"label": rule_index, "children": []}
+
+            # Node compression: if a node has only one child.
+            # Can return the child directly to reduce unnecessary levels in the tree.
+            if len(children_nodes) == 1:
+                # Single child: return it directly to avoid unnecessary nesting
+                return children_nodes[0]
+
+            # Create parent node for multiple children
+            return {"label": rule_index, "children": children_nodes}
+
+    return ParserVisitor
+
+
+def PruneAndHash(tree, lang):
+    """Prune and hash a tree to reduce noise and improve comparison efficiency.
+
+    Args:
+        tree: A dictionary-based tree to prune and hash.
+        lang: The programming language of the source code.
+    Returns:
+        tuple: (hashed_tree, node_count) where hashed_tree is a dictionary
+               and node_count is the total number of nodes in the tree.
+    """
+    hashed_rule_indices = get_hash_rule_indices(lang)
+    control_equivalence_rule_indices = get_control_equivalence_rule_indices(lang)
+    exclude_childrens_from_rule = get_exclude_childrens_from_rule(lang)
+    structural_rule_indices = get_structural_rule_indices(lang)
+    # When set, a hashed node keeps the mass of the subtree it replaced (see
+    # docs/pruning_fidelity.md, "Weighted hashes"); None keeps 1 node = 1.
+    mass_alpha = get_hash_mass_alpha(lang)
+
+    def traverse_subtree(node):
+        # Collect all labels in the subtree rooted at `node` into a single list
+        elements = [node["label"]]
+        for c in node["children"]:
+            elements.extend(traverse_subtree(c))
+        return elements
+
+    def prunning_tree(node):
+        if node is None:
+            return None
+
+        label = node["label"]
+        new_node = {"label": label, "children": []}
+
+        # Get the list of child labels to exclude for this rule, if any
+        childrens_to_exclude = exclude_childrens_from_rule.get(label, [])
+
+        # Otherwise, recurse normally.
+        for children in node["children"]:
+            # Skip children that are in the exclusion list for this rule
+            if children["label"] in childrens_to_exclude:
+                continue
+            new_child = prunning_tree(children)
+            if new_child is not None:
+                new_node["children"].append(new_child)
+        return new_node
+
+    def hash_children(label, childrens):
+        # Flatten all children subtree labels into a single sequence and hash
+        flat = []
+        for c in childrens:
+            flat.extend(traverse_subtree(c))
+        s = "|".join(map(str, flat))
+        digest = str(label) + "|" + hashlib.sha256(s.encode("utf-8")).hexdigest()
+        return digest, flat
+
+    # Ids of nodes whose subtree contains a structural (control-flow/body)
+    # label. A hashed rule that contains one is NOT collapsed: its content is
+    # part of the program's skeleton (e.g. a lambda with a block body), so only
+    # the structure-free pieces below it get hashed. Empty (and skipped) for
+    # languages that don't declare STRUCTURAL_RULE_INDICES.
+    has_structure = set()
+
+    def mark_structure(node):
+        found = node["label"] in structural_rule_indices
+        for c in node["children"]:
+            if mark_structure(c):
+                found = True
+        if found:
+            has_structure.add(id(node))
+        return found
+
+    def hashing_tree(node):
+        if node is None:
+            return None, 0
+
+        # For control flow nodes, we can consider them equivalent regardless of their specific structure
+        label = node["label"]
+        if label in control_equivalence_rule_indices:
+            label = control_equivalence_rule_indices[label]
+
+        # For nodes that are in the hashed rule set, we hash their entire subtree to a single digest
+        if node["label"] in hashed_rule_indices and id(node) not in has_structure:
+            digest, flat = hash_children(label, node["children"])
+            if mass_alpha is None:
+                return {"label": digest, "children": []}, 1
+            # Weight and label multiset let the edit distance charge a hashed
+            # node in proportion to what it replaced and give partial credit
+            # to two hashed nodes of the same kind that share most content.
+            weight = (len(flat) + 1) ** mass_alpha
+            return {
+                "label": digest,
+                "children": [],
+                "weight": weight,
+                "sig": Counter(flat),
+            }, weight
+
+        new_node = {"label": label, "children": []}
+        count = 1
+
+        # For other nodes, we recursively hash their children as usual
+        for children in node["children"]:
+            new_child, child_count = hashing_tree(children)
+            if new_child is not None:
+                new_node["children"].append(new_child)
+                count += child_count
+        return new_node, count
+
+    pruned_tree = prunning_tree(tree)
+    if structural_rule_indices:
+        mark_structure(pruned_tree)
+    hashed_tree, nodes_number = hashing_tree(pruned_tree)
+
+    return hashed_tree, nodes_number
+
+
+def Normalize(tree, lang):
+    """Normalize an ANTLR parse tree to a ZSS tree structure, excluding irrelevant tokens and compressing certain rules.
+
+    Args:
+        tree: ANTLR parse tree to normalize.
+        lang: The programming language of the source code.
+
+    Returns:
+        dict: A normalized tree represented as a dictionary with 'label' and 'children' keys.
+    """
+    excluded_token_types = get_excluded_token_types(lang)
+    excluded_rule_types = get_excluded_rule_types(lang)
+
+    # Get the correct ParserVisitor class for the given language
+    ParserVisitorClass = get_parser_visitor_class(lang)
+    visitor = ParserVisitorClass(excluded_token_types, excluded_rule_types)
+
+    normalized_tree = visitor.visit(tree)
+
+    return normalized_tree

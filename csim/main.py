@@ -1,91 +1,245 @@
 import argparse
-from .utils import group_by_similarity, process_files, compare_all, get_file
+import os
+from .language.parser import ANTLR_parse
+from .processing.tree_processing import Normalize, PruneAndHash
+from .processing.distance_metrics import DEFAULT_INDEX_FORMULA, INDEX_FORMULAS
+from .utils import (
+    count_tree_nodes,
+    group_by_exhaustive_search,
+    print_antlr_tree,
+    print_tree,
+    process_files,
+    report_pairwise_similarity,
+)
+
+
+def print_backend_info():
+    """Report which parser backend each language will use.
+
+    When a compiled parser is missing or fails to load, csim silently falls back
+    to the Python parser: results stay correct, but parsing runs several times
+    slower. This makes that state visible instead of leaving it to be inferred
+    from timings.
+    """
+    from .native.loader import (
+        _LIB_DIR,
+        _NATIVE_CONFIG,
+        _disabled,
+        _library_suffix,
+        is_available,
+    )
+
+    print("csim parser backends")
+    print()
+
+    turned_off = _disabled()
+
+    for lang in ("python_3_13", "python_3", "java_20", "java_24", "cpp_14", "kotlin", "c"):
+        if lang not in _NATIVE_CONFIG:
+            print(f"  {lang:<14} python   (no native parser for this grammar)")
+            continue
+
+        expected = _LIB_DIR / (_NATIVE_CONFIG[lang][0] + _library_suffix())
+
+        if turned_off:
+            state = "available but disabled" if expected.is_file() else "not built"
+        elif is_available(lang):
+            print(f"  {lang:<14} native   (C++, several times faster)")
+            continue
+        else:
+            state = "not built" if not expected.is_file() else "present but failed to load"
+
+        print(f"  {lang:<14} python   (native {state})")
+
+    if turned_off:
+        print()
+        print("  note: CSIM_DISABLE_NATIVE is set, so native parsers are turned off.")
+
+    print()
+    print(f"  library directory: {_LIB_DIR}")
+    print("  build native parsers with: scripts/build_native_parsers.sh")
 
 
 def main():
     """
     Main function to parse command-line arguments and execute the similarity checker.
-    Arguments:
-        --files, -f (str, nargs=2): The input two files to compare.
-        --path, -p (str): Path to the directory containing the source code files.
-        --lang, -l (str): The programming language of the source files. Defaults to 'python'.
-        --threshold, -t (float): Similarity threshold between 0.0 and 1.0. Only valid when used with --path/-p option.
-        --talg, -ta (string): The tree edit distance algorithm to use. Defaults to 'zss'.
-        --help, -h: Show this help message and exit.
+
+    Actions:
+        report: Generate a pairwise similarity report for all files.
+        group: Group files by similarity using a specified strategy.
+        tree (alias: view): Print the normalized/pruned tree for a single file,
+            i.e. the exact tree that gets passed to the tree edit distance algorithm.
+        info: Report which parser backend (native C++ or pure Python) is active
+            for each language. Takes no arguments.
+
+    Arguments for 'report' action:
+        --path, -p (str): Path to a directory containing source code files (required).
+        --lang, -l (str): The programming language of the source files (default: 'python_3_13').
+        --talg, -ta (str): The tree edit distance algorithm to use (default: 'apted').
+        --index, -ix (str): Similarity index formula: 'ratio' (default), 'metric' or 'legacy'.
+
+    Arguments for 'group' action:
+        --path, -p (str): Path to a directory containing source code files (required).
+        --threshold, -t (float): Similarity threshold between 0.0 and 1.0 (required).
+        --strategy, -s (str): Grouping strategy: 'exhaustive' (default).
+        --lang, -l (str): The programming language of the source files (default: 'python_3_13').
+        --talg, -ta (str): The tree edit distance algorithm to use (default: 'apted').
+        --index, -ix (str): Similarity index formula: 'ratio' (default), 'metric' or 'legacy'.
+            Thresholds are scale-dependent: legacy 0.70 == ratio 0.769.
+
+    Arguments for 'tree'/'view' action:
+        --path, -p (str): Path to a single source code file (required).
+        --lang, -l (str): The programming language of the source file (default: 'python_3_13').
+        --show-raw: Also print the raw ANTLR parse tree before normalization/pruning.
+
     Returns:
         None
     """
-    # Create the argument parser
     parser = argparse.ArgumentParser(
-        description="Compare two source code files for similarity."
+        description="A command-line tool to detect code similarity and plagiarism."
     )
 
-    # Create a mutually exclusive group
-    group = parser.add_mutually_exclusive_group(required=True)
+    # Action argument (positional)
+    parser.add_argument(
+        "action",
+        choices=["report", "group", "tree", "view", "info"],
+        help="Action to perform: 'report' for pairwise similarity report, 'group' for grouping "
+        "files by similarity, 'tree'/'view' to print a single file's normalized/pruned tree, "
+        "'info' to show which parser backend is active.",
+    )
 
-    # Add the 'path' argument to the group
-    group.add_argument(
+    # Required for every action except 'info', which inspects the install itself.
+    parser.add_argument(
         "--path",
         "-p",
         type=str,
-        help="Path to the directory containing the source code files to compare.",
+        help="Path to a directory containing source code files.",
     )
 
-    # Add the 'files' argument to the group
-    group.add_argument(
-        "--files", "-f", type=get_file, nargs=2, help="The input two files to compare"
-    )
-
-    # Add the 'lang' argument to the group
+    # Language of the source files
     parser.add_argument(
         "--lang",
         "-l",
-        choices=["python"],
-        default="python",
-        help="The programming language of the source files. Defaults to 'python'.",
+        choices=["python_3_13", "python_3", "java_20", "java_24", "cpp_14", "kotlin", "c"],
+        default="python_3_13",
+        help="The programming language of the source files (default: python_3_13).",
     )
 
-    # Optional threshold used only when --path is selected
-    parser.add_argument(
-        "--threshold",
-        "-t",
-        type=float,
-        help="Similarity threshold between 0.0 and 1.0. Only valid when used with --path/-p option.",
-    )
-
-    # Optional argument for tree edit distance algorithm
+    # Algorithm for tree edit distance
     parser.add_argument(
         "--talg",
         "-ta",
         choices=["zss", "apted"],
-        default="zss",
-        help="The tree edit distance algorithm to use. Defaults to 'zss'.",
+        default="apted",
+        help="The tree edit distance algorithm to use (default: apted).",
     )
 
-    # Parse the arguments
+    # How the edit distance is normalized into the similarity index
+    parser.add_argument(
+        "--index",
+        "-ix",
+        choices=list(INDEX_FORMULAS),
+        default=DEFAULT_INDEX_FORMULA,
+        help="Similarity index formula (default: %(default)s). 'ratio' = "
+        "max/(max+d); 'metric' = (n1+n2-d)/(n1+n2+d); 'legacy' = 1-d/max, the "
+        "index of csim <= 3.4.2. 'ratio' ranks pairs exactly as 'legacy' does "
+        "but on a different scale, so thresholds do not carry over: "
+        "legacy 0.70 = ratio 0.769, legacy 0.80 = ratio 0.833.",
+    )
+
+    # Threshold (only for 'group' action)
+    parser.add_argument(
+        "--threshold",
+        "-t",
+        type=float,
+        default=None,
+        help="Similarity threshold (0.0 to 1.0) for grouping files. Required for 'group' action.",
+    )
+
+    # Strategy (only for 'group' action)
+    parser.add_argument(
+        "--strategy",
+        "-s",
+        choices=["exhaustive"],
+        default="exhaustive",
+        help="Grouping strategy: 'exhaustive' (all-pairs comparison). Default: exhaustive.",
+    )
+
+    # Raw tree flag (only for 'tree'/'view' action)
+    parser.add_argument(
+        "--show-raw",
+        action="store_true",
+        help="For the 'tree'/'view' action, also print the raw ANTLR parse tree "
+        "before normalization/pruning.",
+    )
+
     args = parser.parse_args()
 
-    # Validate conditional use of --threshold: only allowed with --path
-    if args.threshold is not None:
-        if not args.path:
-            parser.error("argument --threshold: can only be used with --path/-p")
-        if not (0.0 <= args.threshold <= 1.0):
-            parser.error("argument --threshold: must be between 0.0 and 1.0")
+    if args.action == "info":
+        print_backend_info()
+        return
 
-    # Process the files
-    file_names, file_contents = process_files(args.path, args.files)
+    if not args.path:
+        parser.error("The --path argument is required for this action.")
+
+    if args.action in ("tree", "view"):
+        if not os.path.isfile(args.path):
+            parser.error(f"The path '{args.path}' is not a valid file.")
+
+        with open(args.path, "r", encoding="utf-8") as file:
+            file_content = file.read()
+
+        raw_tree = ANTLR_parse(args.path, file_content, args.lang)
+
+        if args.show_raw:
+            print("=== Raw ANTLR Parse Tree ===")
+            print_antlr_tree(raw_tree, args.lang)
+            print()
+
+        normalized_tree = Normalize(raw_tree, args.lang)
+        pruned_tree, _ = PruneAndHash(normalized_tree, args.lang)
+        node_count = count_tree_nodes(pruned_tree)
+
+        print("=== Normalized + Pruned Tree (input to Tree Edit Distance) ===")
+        print_tree(pruned_tree, lang=args.lang)
+        print(f"\nTotal nodes after pruning: {node_count}")
+        return
+
+    # Validate arguments based on action
+    if args.action == "group":
+        if args.threshold is None:
+            parser.error("The --threshold argument is required for 'group' action.")
+        if not (0.0 <= args.threshold <= 1.0):
+            parser.error("The --threshold must be a float between 0.0 and 1.0.")
+    elif args.action == "report":
+        if args.threshold is not None:
+            parser.error("The --threshold argument is only valid for 'group' action.")
+        if args.strategy != "exhaustive":
+            parser.error("The --strategy argument is only valid for 'group' action and must be 'exhaustive'.")
 
     try:
-        if len(file_names) >= 2:
-            if args.threshold is not None:
-                results = group_by_similarity(file_names, file_contents, args.lang, args.threshold, args.talg)
-            else:
-                results = compare_all(file_names, file_contents, args.lang, args.talg)
-        else:
-            results = "Please provide at least two files for comparison."
-        print(results)
-    except Exception as e:
-        print(f"An error occurred during comparison: {e}")
+        file_names, file_contents = process_files(args.path, args.lang)
+    except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
+        parser.error(str(exc))
+
+    if len(file_names) < 2:
+        parser.error("At least two files are required for comparison.")
+
+    if args.action == "report":
+        results = report_pairwise_similarity(
+            file_names, file_contents, args.lang, args.talg, args.index
+        )
+    elif args.action == "group":
+        results = group_by_exhaustive_search(
+            file_names,
+            file_contents,
+            args.lang,
+            args.threshold,
+            args.talg,
+            index_formula=args.index,
+        )
+
+    print(results)
 
 
 if __name__ == "__main__":

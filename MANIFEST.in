@@ -1,3 +1,26 @@
+# Sources needed to rebuild the native parsers from an sdist.
+include grammars/*.g4
+include grammars/*Base.cpp
+include grammars/*Base.h
+include grammars/parser_gen_guide.md
+include scripts/build_native_parsers.sh
+include scripts/transform_grammar_for_cpp.py
+include csim/native/src/*.cpp
+
+# The C grammar's symbol-table implementation (typedef disambiguation) --
+# doesn't match the *Base.cpp/*Base.h patterns above since it isn't a
+# lexer/parser base class.
+include grammars/SymbolTable.cpp
+include grammars/SymbolTable.h
+include grammars/Symbol.h
+include grammars/TypeClassification.h
+
 include README.md
 include LICENSE
-recursive-include csim *
+
+# Compiled parsers are platform-specific and ride in the platform wheels.
+# Shipping them in the sdist would install a macOS .dylib onto Linux, where it
+# cannot load -- harmless (csim falls back to Python) but misleading.
+recursive-exclude csim/native/lib *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

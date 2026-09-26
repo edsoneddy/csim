@@ -1,19 +1,17 @@
 # csim
 
-This project analyzes structural similarity between Python source code using
+This project analyzes structural similarity between Python 3.13 source code using
 ANTLR4-generated Parse Trees and Tree Edit Distance (ZSS or APTED).
-
-For next versions, support for additional programming languages will be added.
 
 ## Parse Tree Normalization and ZSS Tree Construction
 
-This project compares Python source code by measuring **structural similarity**
+This project compares Python 3.13 source code by measuring **structural similarity**
 between normalized Parse Trees.
 The Parse Trees are generated using **ANTLR4** and compared using
 **Tree Edit Distance (ZSS or APTED)**
 
 ### Version Baseline
-- **Python:** 3.9–3.12 (recommended 3.11)
+- **Python:** 3.10–3.12 (recommended 3.11)
 - **ANTLR4 Python Runtime:** 4.13.2
 - **zss:** 1.2.0
 - **apted:** 1.0.3
@@ -92,13 +90,30 @@ In this example, the `IN` keyword and variable `NAME` tokens are excluded from `
 
 ### Augmented Assignment Normalization
 
-Augmented assignments are rewritten into a normalized form so equivalent operations compare identically. For example, `i += k` is treated as `i = i + k`. This reduces superficial differences in code that uses different assignment syntax.
+Augmented assignments are rebuilt as the tree of their expanded form, so
+`i += k` and `i = i + k` produce the *same* normalized tree (same rules, same
+children) and therefore hash to the same digest. This is implemented in the
+per-language visitor in `Visitors.py` (Python 3.13, Python 3, Java 20/24, C++,
+C, Kotlin), using token *types* only so it behaves identically on the pure-Python
+and the native parser paths.
 
-The normalization uses a mapping from augmented assignment operators to the parser rule and operator token that represent the equivalent binary operation:
+Each language declares which augmented-assignment tokens it rewrites and the
+binary operator each one stands for, e.g. for C:
 
 ```python
-ASSIGN_OP_NORMALIZED: dict[str, list[int]]
+AUG_ASSIGN_OPS = {
+    CLexer.PlusAssign: (CParser.RULE_additiveExpression, CLexer.Plus),
+    ...
+}
 ```
+
+Two grammar details matter for the rewrite: some grammars parse the target of
+`x = e` and the same text used as an operand under different rules (Python 3.13's
+`star_targets` vs `primary`, Java 20's `arrayAccess` vs `primaryNoNewArray`), and
+the C++ grammar parses a type-less `x = e;` as a *declaration*, so it is also
+rebuilt into the assignment-expression shape. Shift compound operators
+(`<<=`, `>>=`) are left as they are. Known gaps: doubly-indexed targets
+(`a[i][j] op= ...`) in Java 20 and C++.
 
 ### ZSS Tree Construction
 
@@ -125,17 +140,30 @@ During tree construction and pruning, the following transformations are applied:
 3. **Hash-based pruning**: Subtrees of rules in `HASHED_RULE_INDICES` are hashed to create compact representations.
 
 ### Hash-Based Pruning
-To optimize tree size while preserving essential structure, a hash-based pruning strategy is employed.
-The pruning process involves:
-1. **Hashing Subtrees:** Each subtree is hashed to create a unique identifier.
-2. **Identifying Redundant Subtrees:** Subtrees with identical hashes are identified as redundant.
-3. **Pruning Redundant Subtrees:** Redundant subtrees are pruned from the Parse Tree, retaining only one instance of each unique subtree.
+To reduce tree size, whole subtrees are replaced by one node holding a digest of
+their labels. Only **islands** are hashed: expressions, simple statements,
+declarations, parameter lists -- fragments that contain no control flow. The
+program's skeleton (blocks, `if`/loops/`switch`/`try`, functions, classes) is
+never hashed, otherwise whole programs collapse to a handful of nodes and the
+similarity index drifts far from the unpruned tree (see `pruning_fidelity.md`).
 
-Rules whose subtrees are subject to hashing for pruning are defined as:
+Rules whose subtrees are hashed are defined as:
 
 ```python
 HASHED_RULE_INDICES: set[int]
 ```
+
+and the rules that mark a subtree as skeleton are defined as:
+
+```python
+STRUCTURAL_RULE_INDICES: set[int]   # optional; empty if a language declares none
+```
+
+A rule in `HASHED_RULE_INDICES` is only collapsed when its subtree contains no
+`STRUCTURAL_RULE_INDICES` node, so e.g. a lambda with a block body or an
+anonymous class is not flattened -- only the structure-free pieces inside it are.
+Hashing short-circuits top-down: the first hashed rule reached wins. Digests
+compare with cost 0.5 when they share the rule (or the content) but not both.
 
 ### Tree Edit Distance Configuration
 

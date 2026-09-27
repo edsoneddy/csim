@@ -264,3 +264,8 @@ measured here. Rules that need to know whether two identifiers are the same
 (tuple swap <-> temporary, inlining a variable) cannot be written: the native
 parser does not expose terminal text.
 
+Fidelity with 4.1.0, same protocol as the tables above (three sets of 12 problems, mean absolute
+error of the similarity index of the pruned tree vs. the near-raw reference, `python_3`): MAE
+0.053 / 0.061 / 0.054 with canonical forms, 0.052 / 0.061 / 0.054 without them (seeds 7 / 11 / 23;
+bias +0.010 / -0.007 / -0.017). The canonical forms do not move the fidelity of the pruning.
+

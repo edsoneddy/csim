@@ -16,6 +16,7 @@ from ..utils import (
     get_exclude_childrens_from_rule,
     get_excluded_token_types,
     get_hash_rule_indices,
+    get_canonicalizer,
     get_excluded_rule_types,
     get_hash_mass_alpha,
     get_relabel_fn,
@@ -241,5 +242,9 @@ def Normalize(tree, lang):
     visitor = ParserVisitorClass(excluded_token_types, excluded_rule_types)
 
     normalized_tree = visitor.visit(tree)
+
+    canonicalize = get_canonicalizer(lang)
+    if canonicalize is not None and normalized_tree is not None:
+        normalized_tree = canonicalize(normalized_tree)
 
     return normalized_tree

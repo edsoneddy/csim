@@ -3,6 +3,9 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+Note: "dataset F" in the 3.4.2 to 4.0.1 entries is the *first* F (Faidhi ladders, since retired);
+the current F of the scsc repository is a different dataset, see `docs/pruning_fidelity.md`.
+
 ## [4.1.0]
 
 ### Canonical forms for equivalent constructs (`python_3` only)

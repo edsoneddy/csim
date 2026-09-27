@@ -1,5 +1,13 @@
 # Pruning fidelity
 
+> **Note on the name "F".** Everywhere in this document and in the changelog, "dataset F" and "F"
+> refer to the *first* F: 9 hand-designed problems, each a ladder `r0`..`r4` (90 related and 60
+> unrelated pairs). That dataset was used to develop 3.4.2 and 4.0.0 and was then retired from the
+> evaluation. The current dataset F of the scsc repository is a different one (a stress scenario of
+> stacked equivalent rewrites, evaluated once with 4.1.0); its protocol is
+> `docs/dataset_F_protocol.md` there.
+
+
 Pruning (exclusions, collapsing, hashing) compresses the tree for TED, but it
 should not change the similarity index much. This note records how that is
 measured and what was found for `python_3` and `python_3_13`.
@@ -126,7 +134,7 @@ for C, statement keywords (neutral).
   match their expansion exactly.
 * **C**: no assignment-operator rule exists; the operator is a bare terminal.
 
-## Faidhi ladder (dataset F) and weighted hashes (3.4.2, `python_3`)
+## Faidhi ladder (first dataset F, retired) and weighted hashes (3.4.2, `python_3`)
 
 `scsc/notebooks/datasets/F` has 9 small problems, each a ladder r0..r4 where
 every step adds one Faidhi change (rename, reorder, swap a control structure,

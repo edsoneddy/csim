@@ -379,6 +379,19 @@ def get_relabel_fn(lang):
     return None
 
 
+def get_canonicalizer(lang):
+    """Language-specific pass that unifies equivalent forms of a construct on the
+    normalized tree (before pruning and hashing), or None if the language has none."""
+    if lang == "python_3":
+        from .python_3 import utils as lang_utils
+
+        if getattr(lang_utils, "CANONICAL_FORMS", False):
+            from .python_3.canonical import canonicalize
+
+            return canonicalize
+    return None
+
+
 def get_hash_mass_alpha(lang):
     """Exponent applied to the size of a hashed subtree to get its weight in
     the edit distance, or None when the language keeps every node at weight 1."""

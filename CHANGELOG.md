@@ -3,6 +3,40 @@
 Notable releases. Earlier entries were reconstructed from the commit history,
 so they summarise each line rather than list every change.
 
+## [4.1.0]
+
+### Canonical forms for equivalent constructs (`python_3` only)
+
+Equivalent ways of writing the same thing now produce the same tree, so they get
+the same hashes and cost nothing in the edit distance. It is a pass over the
+normalized tree (`csim/python_3/canonical.py`, switched with
+`python_3/utils.py: CANONICAL_FORMS`) that runs before pruning and hashing:
+
+* comparison orientation: `a > b` = `b < a`, `a >= b` = `b <= a`; `==` and `!=`
+  get their operands in a fixed order;
+* negation: `not (a < b)` = `a >= b` (and the other pairs, plus `in` / `not in`
+  and `is` / `is not`), `not not x` = `x`, and De Morgan, `not (a and b)` =
+  `not a or not b` (`and` / `or` are not in the tree, so only the shape moves);
+* commutative operands: the two sides of `and` / `or` and of `*`, `+`, `&`, `|`,
+  `^`;
+* `else: if ...` = `elif ...`.
+
+Chained comparisons (`a < b < c`) are not touched. Every rule uses the shape of
+the tree and token types only (native terminals carry no text), so nothing
+compares identifiers. Other languages, and `python_3_13`, are unchanged.
+
+What it does, measured (details in `docs/pruning_fidelity.md`):
+
+* 190 real programs rewritten with three or more of these equivalences at once:
+  mean similarity to the original 0.922 -> 0.968, identical trees 0% -> 66%.
+  Pairs under 0.70 barely move (2.1% -> 1.6%): csim already held those.
+* Datasets A-E (csim at 0.70): F1 and AUC unchanged within 0.004 (D F1
+  0.933 -> 0.937, E AUC 0.9584 -> 0.9572); 500 cross-problem pairs of `all_py`:
+  0 above 0.70 before and after; controlled clones 34/36 before and after.
+
+Scores can change slightly for programs that contain these constructs, so this is
+a minor version, not a patch. `CANONICAL_FORMS = False` restores 4.0.1 exactly.
+
 ## [4.0.1]
 
 ### `legacy` is the default index again

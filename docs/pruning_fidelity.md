@@ -223,3 +223,36 @@ on the regression datasets (AUC A +0.007, D +0.005, E +0.004, B -0.003, C
 loop (`gcd_r3`, `mergelists_r3`), tuple-swap vs. temporary (`gcd_r2`) and
 reordered/consolidated statements (`sieve_r2`); none is a renaming-level
 difference a tree normalization can remove, so the pipeline was left as is.
+
+## Canonical forms of equivalent constructs (4.1.0, `python_3`)
+
+Question: how much do semantically equivalent rewrites hurt each method, and
+what would unifying them in csim buy? 400 real programs of `all_py` (12-45
+lines) were rewritten with `ast` in 16 equivalent ways (`x += y` <-> `x = x + y`,
+`a < b` <-> `b > a`, De Morgan, `!=` <-> `not ==`, commutative operand order,
+`range(0, n)` <-> `range(n)`, if/else assignment <-> ternary, ...), both sides
+through `ast.unparse` so only the rewrite differs. Similarity to the original,
+one rewrite at a time (1060 pairs): under 0.70 in 0% of the pairs for `ted` and
+`mdiff`, 0.1% for csim, 1.8% `gst`, 4.1% `lf`, 14.7% `trs`.
+
+With three or more equivalences applied to the same program (190 programs), which
+is what a student who rewrites many small things produces:
+
+| method | mean similarity | under 0.70 |
+|---|---|---|
+| csim 4.1.0 | 0.968 | 1.6% |
+| ted | 0.929 | 0.0% |
+| csim 4.0.1 | 0.922 | 2.1% |
+| mdiff | 0.909 | 1.1% |
+| gst | 0.753 | 30.0% |
+| lf | 0.660 | 59.5% |
+| trs | 0.551 | 88.9% |
+
+Reading: the tree-based methods already resist these rewrites and the token-based
+ones do not; unifying the forms raises csim's margin (and 66% of the pairs become
+identical trees) without changing how many pairs cross 0.70. The rewrites are
+mechanical and chosen by us, so how often real students use each one is not
+measured here. Rules that need to know whether two identifiers are the same
+(tuple swap <-> temporary, inlining a variable) cannot be written: the native
+parser does not expose terminal text.
+

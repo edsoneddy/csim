@@ -252,6 +252,10 @@ HASHED_RULE_INDICES = {
     # without hashing anything.
 }
 
+# Unify equivalent forms of the same construct (a > b / b < a, not (a and b) /
+# not a or not b, else: if / elif, ...) before pruning; see python_3/canonical.py.
+CANONICAL_FORMS = True
+
 # Exponent for the weight of a hashed node (its subtree size ** alpha) in the
 # tree edit distance; see docs/pruning_fidelity.md, "Weighted hashes".
 HASH_MASS_ALPHA = 0.6

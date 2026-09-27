@@ -31,21 +31,21 @@ Figures are in `nodes_reduction/results/`, all on the real (linear) node count: 
 
 ## Homework similarity (`homeworks/main_all.ipynb`, `main_groups.ipynb`)
 
-Dataset `INF-111-JT-Tarea 1-6876` with `python_3` and APTED (csim 4.0.1): **56 files**, **1540 pairs**.
+Dataset `INF-111-JT-Tarea 1-6876` with `python_3` and APTED (csim 4.1.0): **56 files**, **1540 pairs**.
 
 | Statistic | Value |
 |---|---|
-| Mean similarity | 0.370 |
+| Mean similarity | 0.372 |
 | Median similarity | 0.34 |
 | p90 / max | 0.57 / 1.00 |
-| Pairs above 0.6 | 109 (7.1%) |
+| Pairs above 0.6 | 113 (7.3%) |
 | Pairs above 0.8 | 10 |
 
 Grouping at threshold 0.6 (union-find): **2 group(s)** with more than one file, 19 unique files.
 
 | Group | Files | Average similarity |
 |---|---|---|
-| 1 | 19 | 0.56 |
-| 2 | 18 | 0.56 |
+| 1 | 19 | 0.57 |
+| 2 | 18 | 0.55 |
 
 Groups are built with union-find, so similarity can chain: a group's average (each member against its first file) may fall below the threshold.

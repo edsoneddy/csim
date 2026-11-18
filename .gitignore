@@ -32,3 +32,6 @@ snippet_bank/
 # Compiled native parsers: build artifacts, rebuilt per platform by CI or
 # locally with scripts/build_native_parsers.sh
 csim/native/lib/
+
+# Real student submissions (cátedra) - never commit
+/datasets

@@ -1,0 +1,6 @@
+for a in *.py
+do
+  unexpand -a -t 4 $a >$a-notab
+  mv $a-notab $a
+done
+

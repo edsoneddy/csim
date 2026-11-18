@@ -33,5 +33,3 @@ snippet_bank/
 # locally with scripts/build_native_parsers.sh
 csim/native/lib/
 
-# Real student submissions (cátedra) - never commit
-/datasets

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+shopt -s globstar nullglob
+for file in **/*.py; do
+    echo "$file"
+    io.elementary.code "$file"
+    #read
+done
